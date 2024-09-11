@@ -9,6 +9,7 @@ class USpringArmComponent;
 class UCameraComponent;
 
 // To do:
+// - Use normals in wall to determine character's forward vector. 
 // - Wall climbing
 // - Wall jumping
 // - ? Separate camera when sprinting for a long time, or in special areas ?
@@ -111,6 +112,7 @@ private:
 	float HookLength = 1200.f;
 
 	float TimeSinceMoved = 0.f;
+	float CantClimbTimer = 0.f;
 	
 	FVector CharacterMovement;
 	FVector2D CameraMovement;
@@ -132,6 +134,7 @@ private:
 	void HandleSprintStop();
 	void CheckBackwardJumpEligibility();
 	void CheckWallClimb();
+	void StopClimbing();
 
 	// Camera movement 
 	void HandleMouseInputX(const float Value);

@@ -54,6 +54,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	case Eps_Walking:
 		GetCharacterMovement()->MaxWalkSpeed = 600.f * MovementSpeedPercent * MovementEnergy;
 		GetCharacterMovement()->SetWalkableFloorAngle(50.f);
+		GetCharacterMovement()->bOrientRotationToMovement = true;
 		CheckFloorAngle();
 		CheckIdleness();
 		SetSpringArmLength(StandardSpringArmLength, SpringArmSwitchSpeed);
@@ -118,8 +119,9 @@ void AMyCharacter::Tick(float const DeltaTime)
 		break;
 
 	case Eps_Climbing:
-		UE_LOG(LogTemp, Warning, TEXT("Climbing."))
-		CurrentState = Eps_Walking;
+		// UE_LOG(LogTemp, Warning, TEXT("Climbing."))
+		GetCharacterMovement()->MovementMode = MOVE_Flying;
+		GetCharacterMovement()->bOrientRotationToMovement = false;
 		break;
 		
 	default:
@@ -152,6 +154,7 @@ void AMyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	PlayerInputComponent->BindAction("Aim", IE_Pressed, this, &AMyCharacter::HandleAimInput);
 	PlayerInputComponent->BindAction("Aim", IE_Released, this, &AMyCharacter::HandleAimStop);
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMyCharacter::LookForHook);
+	PlayerInputComponent->BindAction("Drop", IE_Pressed, this, &AMyCharacter::StopClimbing);
 }
 
 void AMyCharacter::HandleForwardInput(const float Value)
@@ -171,14 +174,28 @@ void AMyCharacter::MovementOutput()
 		UE_LOG(LogTemp, Error, TEXT("MyCharacter Line 99, no controller"));
 		return;
 	}
+
+	if (CurrentState != Eps_Climbing)
+		CharacterMovement = FVector(CharacterMovementForward, CharacterMovementSideways, 0.f);
+
+	else
+		CharacterMovement = FVector(0.f, CharacterMovementSideways, CharacterMovementForward);
 	
-	CharacterMovement = FVector(CharacterMovementForward, CharacterMovementSideways, 0.f);
 	CharacterMovement.Normalize();
-	
-	// Walk toward camera's forward vector 
-	const FRotator CameraRotation = Controller->GetControlRotation();
-	const FRotator YawRotation(0.f, CameraRotation.Yaw, 0.f);
-	CharacterMovement = YawRotation.RotateVector(CharacterMovement);
+
+	if (CurrentState != Eps_Climbing)
+	{
+		// Walk toward camera's forward vector 
+		const FRotator CameraRotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0.f, CameraRotation.Yaw, 0.f);
+		CharacterMovement = YawRotation.RotateVector(CharacterMovement);
+	}
+
+	else
+	{
+		// Climb in relation to character's rotation 
+		CharacterMovement = GetActorForwardVector().Rotation().RotateVector(CharacterMovement);
+	}
 	
 	AddMovementInput(CharacterMovement);
 }
@@ -267,6 +284,17 @@ void AMyCharacter::CheckExhaustion()
 
 void AMyCharacter::HandleJumpInput()
 {
+	if (CurrentState == Eps_Climbing)
+	{
+		CantClimbTimer = 0.5f;
+		GetCharacterMovement()->BrakingDecelerationFlying = 1000.f;
+		GetCharacterMovement()->AddImpulse(CharacterMovement * JumpImpulseUp);
+		UE_LOG(LogTemp, Warning, TEXT("Wall jumping. Movement: %s"), *CharacterMovement.ToString());
+		return;
+	}
+
+	// if (CurrentState == Eps_Climbing)
+	
 	if (bHasBackwardJumpAngle && bIsTurningBackward && !GetCharacterMovement()->IsMovingOnGround())
 		GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, JumpImpulseUp) + CharacterMovement * JumpImpulseBack);
 	
@@ -310,7 +338,7 @@ void AMyCharacter::CheckBackwardJumpEligibility()
 	else
 		bIsTurningBackward = false;
 	
-	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted)
+	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
 	{
 		GetCharacterMovement()->GravityScale = 0.f;
 		GetCharacterMovement()->Velocity = FVector(0.f, 0.f, -250.f);
@@ -326,6 +354,12 @@ void AMyCharacter::CheckBackwardJumpEligibility()
 
 void AMyCharacter::CheckWallClimb()
 {
+	if (CantClimbTimer < 1.f)
+	{
+		CantClimbTimer += GetWorld()->DeltaTimeSeconds;
+		return;
+	}
+
 	FVector StartWallAngle = GetActorLocation();
 	FVector EndForwardAngle = GetActorLocation() + GetActorForwardVector() * 40.f;
 	FVector EndRightAngle = GetActorLocation() + GetActorForwardVector() * 40.f + GetActorRightVector() * 25.f;
@@ -341,11 +375,29 @@ void AMyCharacter::CheckWallClimb()
 	DrawDebugLine(GetWorld(), StartWallAngle, EndRightAngle, FColor::Green, false, 0.5f, 0.f, 2.f);
 	DrawDebugLine(GetWorld(), StartWallAngle, EndLeftAngle, FColor::Blue, false, 0.5f, 0.f, 2.f);
 
+	
 	// Check if all LineTraces find the climbing wall. 
 	if (GetWorld()->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
 		&& GetWorld()->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
 		&& GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams()))
-			CurrentState = Eps_Climbing;
+	{
+		GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
+		CurrentState = Eps_Climbing;
+	}
+
+	else if (!GetWorld()->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
+		&& CurrentState == Eps_Climbing)
+		StopClimbing();
+}
+
+void AMyCharacter::StopClimbing()
+{
+	if (CurrentState != Eps_Climbing)
+		return;
+	
+	CantClimbTimer = 0.f;
+	GetCharacterMovement()->MovementMode = MOVE_Walking;
+	CurrentState = Eps_Walking;
 }
 
 void AMyCharacter::HandleMouseInputX(const float Value)
