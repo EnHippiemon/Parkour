@@ -8,12 +8,7 @@ class USceneComponent;
 class USpringArmComponent;
 class UCameraComponent;
 
-// How many lectures per week? Lecture hours? 3x3.
-
 // To do:
-// - Use normals in wall to determine character's forward vector. 
-// - Wall climbing
-// - Climbing up/down makes opposite rotation on character.  
 // - ? Separate camera when sprinting for a long time, or in special areas ?
 // - I have added Velocity length to sprint input. Double check so it doesn't bug. 
 
@@ -89,6 +84,24 @@ public:
 	float SpringArmSwitchSpeed = 0.05f;
 
 	UPROPERTY(EditDefaultsOnly)
+	float NormalCameraSwitchSpeed = 0.02f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float SprintingFieldOfView = 125.f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float SprintFOVSpeed = 0.3f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float AimingFieldOfView = 70.f;
+
+	UPROPERTY(EditDefaultsOnly)
+	FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
+
+	UPROPERTY(EditDefaultsOnly)
+	float AimingCameraMoveSpeed = 0.3f;
+
+	UPROPERTY(EditDefaultsOnly)
 	float JumpImpulseUp = 50000.f;
 
 	UPROPERTY(EditDefaultsOnly)
@@ -152,6 +165,7 @@ private:
 	void MoveToLocation(const FLatentActionInfo&, const float) const;
 	void SetSpringArmLength(const float, const float) const;
 	void SetSpringArmOffset(const FVector&, const float) const;
+	void SetFieldOfView(const float, const float) const;
 	
 	// Math functions
 	// static float CountSmallestValue(const float a, const float b, const float c);

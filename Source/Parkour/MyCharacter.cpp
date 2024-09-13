@@ -57,7 +57,9 @@ void AMyCharacter::Tick(float const DeltaTime)
 		GetCharacterMovement()->bOrientRotationToMovement = true;
 		CheckFloorAngle();
 		CheckIdleness();
-		SetSpringArmLength(StandardSpringArmLength, SpringArmSwitchSpeed);
+		SetSpringArmLength(StandardSpringArmLength, NormalCameraSwitchSpeed);
+		SetFieldOfView(90.f, NormalCameraSwitchSpeed);
+
 		break;
 
 	case Eps_Sprinting:
@@ -65,6 +67,9 @@ void AMyCharacter::Tick(float const DeltaTime)
 		GetCharacterMovement()->SetWalkableFloorAngle(90.f);
 		CheckFloorAngle();
 		SetSpringArmLength(SprintingSpringArmLength, SpringArmSwitchSpeed);
+		SetFieldOfView(SprintingFieldOfView, SprintFOVSpeed);
+		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
+			HandleSprintStop();
 		break;
 		
 	case Eps_Aiming:
@@ -75,7 +80,8 @@ void AMyCharacter::Tick(float const DeltaTime)
 		GetCharacterMovement()->bUseControllerDesiredRotation = true;
 		GetCharacterMovement()->RotationRate = FRotator(0.f, AimRotationRate, 0.f);
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.05f);
-		SetSpringArmOffset(FVector(0.f, 50.f, -10.f), 0.3f);
+		SetSpringArmOffset(AimingCameraOffset, AimingCameraMoveSpeed);
+		SetFieldOfView(AimingFieldOfView, AimingCameraMoveSpeed);
 		break;
 
 	case Eps_LeaveAiming:
@@ -85,12 +91,11 @@ void AMyCharacter::Tick(float const DeltaTime)
 		GetCharacterMovement()->bOrientRotationToMovement = true;
 		GetCharacterMovement()->bUseControllerDesiredRotation = false;
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
+		SetSpringArmLength(300.f, NormalCameraSwitchSpeed);
+		SetFieldOfView(90.f, NormalCameraSwitchSpeed);
 		
 		if (bIsUsingHookShot)
-		{
 			GetCharacterMovement()->Velocity = FVector(0, 0, 0);
-			SetSpringArmLength(300.f, SpringArmSwitchSpeed);
-		}
 
 		if (bIsUsingHookShot && (GetActorLocation() - TargetLocation).Length() < 10.f)
 			bIsUsingHookShot = false;
@@ -119,10 +124,11 @@ void AMyCharacter::Tick(float const DeltaTime)
 		break;
 
 	case Eps_Climbing:
-		// UE_LOG(LogTemp, Warning, TEXT("Climbing."))
 		GetCharacterMovement()->MovementMode = MOVE_Flying;
 		GetCharacterMovement()->bOrientRotationToMovement = false;
-		
+		SetSpringArmLength(StandardSpringArmLength, NormalCameraSwitchSpeed);
+		SetFieldOfView(90.f, NormalCameraSwitchSpeed);
+
 		// Makes sure that the player is pushed to the wall and doesn't fall off
 		if (CantClimbTimer >= 1.f)
 			GetCharacterMovement()->AddImpulse(GetActorForwardVector() * 1000.f);
@@ -135,12 +141,11 @@ void AMyCharacter::Tick(float const DeltaTime)
 	}
 
 	if (CurrentState != Eps_Aiming)
-	{
-		SetSpringArmOffset(FVector(0.f, 0.f, 0.f), SpringArmSwitchSpeed);
-	}
+		SetSpringArmOffset(FVector(0.f, 0.f, 0.f), NormalCameraSwitchSpeed);
 
 	if (CurrentState != Eps_Idle)
-		FollowCamera->FieldOfView = FMathf::Lerp(FollowCamera->FieldOfView, 90, 0.001f);
+		SetFieldOfView(90, 0.001f);
+		// FollowCamera->FieldOfView = FMathf::Lerp(FollowCamera->FieldOfView, 90, 0.001f);
 }
 
 void AMyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -374,25 +379,33 @@ void AMyCharacter::CheckWallClimb()
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
 	
-	DrawDebugLine(GetWorld(), StartWallAngle, EndForwardAngle, FColor::Red, false, 0.5f, 0.f, 2.f);
-	DrawDebugLine(GetWorld(), StartWallAngle, EndRightAngle, FColor::Green, false, 0.5f, 0.f, 2.f);
-	DrawDebugLine(GetWorld(), StartWallAngle, EndLeftAngle, FColor::Blue, false, 0.5f, 0.f, 2.f);
-
+	// DrawDebugLine(GetWorld(), StartWallAngle, EndForwardAngle, FColor::Red, false, 0.5f, 0.f, 2.f);
+	// DrawDebugLine(GetWorld(), StartWallAngle, EndRightAngle, FColor::Green, false, 0.5f, 0.f, 2.f);
+	// DrawDebugLine(GetWorld(), StartWallAngle, EndLeftAngle, FColor::Blue, false, 0.5f, 0.f, 2.f);
 	
 	// Check if all LineTraces find the climbing wall. 
 	if (GetWorld()->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
 		&& GetWorld()->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
 		&& GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams()))
 	{
-		GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
-		CurrentState = Eps_Climbing;
-		FRotator WallAngle = HitResultForward.ImpactNormal.Rotation();
-		UE_LOG(LogTemp, Warning, TEXT("Wall angle: %s"), *WallAngle.ToString());
-		SetActorRotation(FMath::Lerp(
-			GetActorRotation(),
-			FRotator(0.f, 180.f, 0.f)
-			+ FRotator(-WallAngle.Pitch, WallAngle.Yaw, 0.f), /*WallAngle,*/
-			0.05f));
+		if (CurrentState == Eps_Aiming)
+		{
+			SavedState = Eps_Climbing;
+			CurrentState = Eps_LeaveAiming;
+		}
+
+		else
+		{
+			GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
+			CurrentState = Eps_Climbing;
+			FRotator WallAngle = HitResultForward.ImpactNormal.Rotation();
+			UE_LOG(LogTemp, Warning, TEXT("Wall angle: %s"), *WallAngle.ToString());
+			SetActorRotation(FMath::Lerp(
+				GetActorRotation(),
+				FRotator(0.f, 180.f, 0.f)
+				+ FRotator(-WallAngle.Pitch, WallAngle.Yaw, 0.f), /*WallAngle,*/
+				0.05f));
+		}
 	}
 
 	else if (CurrentState == Eps_Climbing)
@@ -526,4 +539,13 @@ void AMyCharacter::SetSpringArmOffset(const FVector& NewOffset, const float Alph
 	NewOffset,
 	Alpha
 	);
+}
+
+void AMyCharacter::SetFieldOfView(const float NewFOV, const float Alpha) const
+{
+	FollowCamera->FieldOfView = FMath::Lerp(
+		FollowCamera->FieldOfView,
+		NewFOV,
+		Alpha
+		);
 }
