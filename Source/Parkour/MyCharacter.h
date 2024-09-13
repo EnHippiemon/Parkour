@@ -8,11 +8,14 @@ class USceneComponent;
 class USpringArmComponent;
 class UCameraComponent;
 
+// How many lectures per week? Lecture hours? 3x3.
+
 // To do:
 // - Use normals in wall to determine character's forward vector. 
 // - Wall climbing
-// - Wall jumping
+// - Climbing up/down makes opposite rotation on character.  
 // - ? Separate camera when sprinting for a long time, or in special areas ?
+// - I have added Velocity length to sprint input. Double check so it doesn't bug. 
 
 // Backward jump implementation:
 // v Use the line tracing for movement speed.
