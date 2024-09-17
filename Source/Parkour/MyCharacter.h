@@ -73,7 +73,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly)
 	float AimCameraSpeed = 50000.f;
-	
+		
+	UPROPERTY(EditDefaultsOnly)
+	float AimEnergyDepletionSpeed = 7.5f;
+		
 	UPROPERTY(EditDefaultsOnly)
 	float StandardSpringArmLength = 400.f;
 
@@ -81,10 +84,19 @@ public:
 	float SprintingSpringArmLength = 600.f;
 
 	UPROPERTY(EditDefaultsOnly)
+	float StopAimingSpringArmLength = 400.f;
+
+	UPROPERTY(EditDefaultsOnly)
 	float SpringArmSwitchSpeed = 0.05f;
 
 	UPROPERTY(EditDefaultsOnly)
 	float NormalCameraSwitchSpeed = 0.02f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float StillFieldOfView = 60.f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float WalkingFieldOfView = 70.f;
 
 	UPROPERTY(EditDefaultsOnly)
 	float SprintingFieldOfView = 125.f;
@@ -139,6 +151,8 @@ private:
 	bool bHasBackwardJumpAngle = false;
 	bool bIsTurningBackward = false;
 
+	void PlayerStateSwitch();
+	
 	// Character movement
 	void HandleForwardInput(const float Value);
 	void HandleSidewaysInput(const float Value);
