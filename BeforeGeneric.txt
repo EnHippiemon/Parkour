@@ -44,6 +44,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	CameraMovementOutput();
 	CheckFloorAngle();
 	CheckExhaustion();
+	CheckBackwardJumpEligibility();
 	CheckWallClimb();
 
 	// Keep last 
@@ -84,13 +85,15 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->bOrientRotationToMovement = true;
 		CheckFloorAngle();
 		CheckIdleness();
-		// SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
-		// What is below is probably useless. Just use the above?
 		MyLerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
+		// SetSpringArmLength(StandardSpringArmLength, NormalCameraSwitchSpeed);
 		if (GetCharacterMovement()->Velocity.Length() != 0)
 			MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed);
+			// SetFieldOfView(WalkingFieldOfView, NormalCameraSwitchSpeed);
 		else
 			MyLerp(FollowCamera->FieldOfView, StillFieldOfView, NormalCameraSwitchSpeed);
+			// SetFieldOfView(StillFieldOfView, NormalCameraSwitchSpeed);
+
 		break;
 
 	case Eps_Sprinting:
@@ -98,22 +101,30 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->SetWalkableFloorAngle(90.f);
 		CheckFloorAngle();
 		MyLerp(SpringArm->TargetArmLength, SprintingSpringArmLength, SpringArmSwitchSpeed);
+		// SetSpringArmLength(SprintingSpringArmLength, SpringArmSwitchSpeed);
 		MyLerp(FollowCamera->FieldOfView, SprintingFieldOfView, SprintFOVSpeed);
+		// SetFieldOfView(SprintingFieldOfView, SprintFOVSpeed);
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
 		break;
 		
 	case Eps_Aiming:
+		// if (MovementEnergy <= 0.f)
+		// 	CurrentState = Eps_LeaveAiming;
+		//
 		CurrentCameraSpeed = AimCameraSpeed;
 		SpringArm->CameraRotationLagSpeed = 1000.f;
 		MovementEnergy -= GetWorld()->DeltaTimeSeconds * AimEnergyDepletionSpeed;
 		MyLerp(SpringArm->TargetArmLength, 100.f, 0.3f);
+		// SetSpringArmLength(100.f, 0.3f);
 		GetCharacterMovement()->bOrientRotationToMovement = false;
 		GetCharacterMovement()->bUseControllerDesiredRotation = true;
 		GetCharacterMovement()->RotationRate = FRotator(0.f, AimRotationRate, 0.f);
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.05f);
 		MyLerp(SpringArm->SocketOffset, AimingCameraOffset, AimingCameraMoveSpeed);
+		// SetSpringArmOffset(AimingCameraOffset, AimingCameraMoveSpeed);
 		MyLerp(FollowCamera->FieldOfView, AimingFieldOfView, AimingCameraMoveSpeed);
+		// SetFieldOfView(AimingFieldOfView, AimingCameraMoveSpeed);
 		break;
 
 	case Eps_LeaveAiming:
@@ -124,7 +135,9 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->bUseControllerDesiredRotation = false;
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
 		MyLerp(SpringArm->TargetArmLength, StopAimingSpringArmLength, NormalCameraSwitchSpeed);
+		// SetSpringArmLength(StopAimingSpringArmLength, NormalCameraSwitchSpeed);
 		MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed);
+		// SetFieldOfView(WalkingFieldOfView, NormalCameraSwitchSpeed);
 		
 		if (bIsUsingHookShot)
 			GetCharacterMovement()->Velocity = FVector(0, 0, 0);
@@ -143,7 +156,10 @@ void AMyCharacter::PlayerStateSwitch()
 		CheckIdleness();
 		AddControllerYawInput(GetWorld()->DeltaTimeSeconds * 2);
 		MyLerp(SpringArm->TargetArmLength, 10000.f, 0.0001f);
+		// SetSpringArmLength(10000.f, 0.0001f);
 		MyLerp(FollowCamera->FieldOfView, 60.f, 0.0001f);
+		// SetFieldOfView(60.f, 0.0001f);
+		// FollowCamera->FieldOfView = FMathf::Lerp(FollowCamera->FieldOfView, 105, 0.001f);
 		
 		if (SpringArm->GetTargetRotation().Vector().Z > -0.25f)
 			AddControllerPitchInput(GetWorld()->DeltaTimeSeconds / 2);
@@ -159,7 +175,9 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->MovementMode = MOVE_Flying;
 		GetCharacterMovement()->bOrientRotationToMovement = false;
 		MyLerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
+		// SetSpringArmLength(StandardSpringArmLength, NormalCameraSwitchSpeed);
 		MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed);
+		// SetFieldOfView(WalkingFieldOfView, NormalCameraSwitchSpeed);
 		SpringArm->CameraLagSpeed = 1.f;
 		SpringArm->CameraLagMaxDistance = 10.f;
 
@@ -176,9 +194,11 @@ void AMyCharacter::PlayerStateSwitch()
 
 	if (CurrentState != Eps_Aiming)
 		MyLerp(SpringArm->SocketOffset, FVector(0.f, 0.f, 0.f), NormalCameraSwitchSpeed);
+		// SetSpringArmOffset(FVector(0.f, 0.f, 0.f), NormalCameraSwitchSpeed);
 
 	if (CurrentState != Eps_Idle)
 		MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, 0.001f);
+		// SetFieldOfView(WalkingFieldOfView, 0.001f);
 }
 
 void AMyCharacter::HandleForwardInput(const float Value)
@@ -236,6 +256,10 @@ void AMyCharacter::CheckFloorAngle()
 	FHitResult HitResultLeft;
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
+	
+	// DrawDebugLine(GetWorld(), StartFloorAngle, EndForwardAngle, FColor::Red, false, 0.5f, 0.f, 2.f);
+	// DrawDebugLine(GetWorld(), StartFloorAngle, EndRightAngle, FColor::Green, false, 0.5f, 0.f, 2.f);
+	// DrawDebugLine(GetWorld(), StartFloorAngle, EndLeftAngle, FColor::Blue, false, 0.5f, 0.f, 2.f);
 
 	// If the line trace is null distance = 0. Then setting distance to max so the other ones are shorter. 
 	if (!GetWorld()->LineTraceSingleByChannel(HitResultForward, StartFloorAngle, EndForwardAngle, ECC_GameTraceChannel18, Parameters, FCollisionResponseParams()))
@@ -248,25 +272,10 @@ void AMyCharacter::CheckFloorAngle()
 		HitResultLeft.Distance = FLT_MAX;
 
 	FloorAngle = FMath::Min3(HitResultForward.Distance, HitResultLeft.Distance, HitResultRight.Distance) / 100.f;
-	
-	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
-	{
-		GetCharacterMovement()->GravityScale = 0.f;
-		GetCharacterMovement()->Velocity = FVector(0.f, 0.f, -250.f);
-		GetCharacterMovement()->JumpZVelocity = 0;
-	}
-
-	else
-	{
-		GetCharacterMovement()->GravityScale = 2.f;
-		GetCharacterMovement()->JumpZVelocity = 763;
-	}
 }
 
 void AMyCharacter::CheckExhaustion()
 {
-	float MovementLoss = 0.f;
-	
 	if (MovementEnergy >= 1.f)
 		bIsExhausted = false;
 	
@@ -278,6 +287,24 @@ void AMyCharacter::CheckExhaustion()
 		else 
 			CurrentState = Eps_Walking;
 	}
+	
+	else if (FloorAngle < 0.74f
+		&& MovementEnergy > 0.f
+		&& GetCharacterMovement()->Velocity.Length() > 0.f
+		&& CurrentState == Eps_Sprinting)
+		MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
+		
+	else if (FloorAngle < 0.77f
+		&& MovementEnergy > 0.f
+		&& GetCharacterMovement()->Velocity.Length() > 0.f
+		&& CurrentState == Eps_Sprinting)
+		MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
+	
+	else if (FloorAngle < 0.8f
+		&& MovementEnergy > 0.f
+		&& GetCharacterMovement()->Velocity.Length() > 0.f
+		&& CurrentState == Eps_Sprinting)
+		MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
 
 	// I just wanted some exponential energy drain depending on the floor angle. Above is better though
 	// else if (FloorAngle < 0.8f
@@ -286,64 +313,8 @@ void AMyCharacter::CheckExhaustion()
 	// 	&& CurrentState == Eps_Sprinting)
 	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / FMath::Pow(10, FloorAngle) * 3;
 	//
-	
-	// else if (FloorAngle < 0.74f
-	// 	&& MovementEnergy > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// {
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * 
-	// 	MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	// }
-	
-	else if (FloorAngle < 0.74f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-		
-	else if (FloorAngle < 0.77f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
-	
-	else if (FloorAngle < 0.8f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
-	
-
 	else if (MovementEnergy < 1.f)
 		MovementEnergy += GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	
-	// else if (FloorAngle < 0.74f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	// 	
-	// else if (FloorAngle < 0.77f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
-	//
-	// else if (FloorAngle < 0.8f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
-	//
-	// // I just wanted some exponential energy drain depending on the floor angle. Above is better though
-	// // else if (FloorAngle < 0.8f
-	// // 	&& MovementEnergy > 0.f
-	// // 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// // 	&& CurrentState == Eps_Sprinting)
-	// // 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / FMath::Pow(10, FloorAngle) * 3;
-	// //
-	// else if (MovementEnergy < 1.f)
-	// 	MovementEnergy += GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
 	
 	// Decide movement speed
 	if (FloorAngle == 0.f)
@@ -356,9 +327,6 @@ void AMyCharacter::CheckExhaustion()
 		FloorAngle *= FloorAngle;
 	
 	MovementSpeedPercent = FloorAngle;
-	UE_LOG(LogTemp, Warning, TEXT("MovementLoss: %f"), MovementLoss);
-
-	MovementEnergy -= MovementLoss;
 }
 
 void AMyCharacter::HandleJumpInput()
@@ -372,10 +340,10 @@ void AMyCharacter::HandleJumpInput()
 		return;
 	}
 	
-	if (BCanJumpBackwards() && !GetCharacterMovement()->IsMovingOnGround())
+	if (bHasBackwardJumpAngle && bIsTurningBackward && !GetCharacterMovement()->IsMovingOnGround())
 		GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, JumpImpulseUp) + CharacterMovement * JumpImpulseBack);
 	
-	else if (BCanJumpBackwards() && GetCharacterMovement()->IsMovingOnGround())
+	else if (bHasBackwardJumpAngle && bIsTurningBackward && GetCharacterMovement()->IsMovingOnGround())
 		GetCharacterMovement()->AddImpulse(CharacterMovement * JumpImpulseBack);
 	
 	if (GetCharacterMovement()->IsMovingOnGround() && !bIsExhausted)
@@ -401,11 +369,32 @@ void AMyCharacter::HandleSprintStop()
 	CurrentState = Eps_Walking;
 }
 
-bool AMyCharacter::BCanJumpBackwards() const
+void AMyCharacter::CheckBackwardJumpEligibility()
 {
-	if (FloorAngle < 0.77f && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
-		return true;
-	return false;
+	// Decides if you can jump backward
+	if (FloorAngle < 0.45f)
+		bHasBackwardJumpAngle = true;
+	else
+		bHasBackwardJumpAngle = false;
+
+	// Check vector differences 
+	if (const float VectorDifference = (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
+		bIsTurningBackward = true;
+	else
+		bIsTurningBackward = false;
+	
+	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
+	{
+		GetCharacterMovement()->GravityScale = 0.f;
+		GetCharacterMovement()->Velocity = FVector(0.f, 0.f, -250.f);
+		GetCharacterMovement()->JumpZVelocity = 0;
+	}
+
+	else
+	{
+		GetCharacterMovement()->GravityScale = 2.f;
+		GetCharacterMovement()->JumpZVelocity = 763;
+	}
 }
 
 void AMyCharacter::CheckWallClimb()
@@ -426,7 +415,11 @@ void AMyCharacter::CheckWallClimb()
 	FHitResult HitResultLeft;
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
-
+	
+	// DrawDebugLine(GetWorld(), StartWallAngle, EndForwardAngle, FColor::Red, false, 0.5f, 0.f, 2.f);
+	// DrawDebugLine(GetWorld(), StartWallAngle, EndRightAngle, FColor::Green, false, 0.5f, 0.f, 2.f);
+	// DrawDebugLine(GetWorld(), StartWallAngle, EndLeftAngle, FColor::Blue, false, 0.5f, 0.f, 2.f);
+	
 	// Check if all LineTraces find the climbing wall. 
 	if (GetWorld()->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
 		&& GetWorld()->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
@@ -535,7 +528,7 @@ void AMyCharacter::LookForHook()
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
 
-	const FVector StartHookSearch = FollowCamera->GetComponentLocation();
+	const FVector StartHookSearch = FollowCamera->GetComponentLocation(); /*GetActorLocation() + GetActorUpVector() * 50.f;*/
 	const FVector EndHookSearch = FollowCamera->GetComponentLocation() + FollowCamera->GetForwardVector() * HookLength;
 
 	DrawDebugLine(GetWorld(), StartHookSearch, EndHookSearch, FColor::Purple, false, 0.1f, 0.f, 3.f);
@@ -548,8 +541,8 @@ void AMyCharacter::LookForHook()
 		TargetLocation = HookshotTarget.Location - FollowCamera->GetForwardVector() * 50.f - FVector(0, 0, 100.f);
 		bIsUsingHookShot = true;
 		CurrentState = Eps_LeaveAiming;
-
-		MoveToLocation(LatentInfo, HookshotTarget.Distance/HookshotSpeed);
+		
+		MoveToLocation(LatentInfo, HookshotTarget.Distance/1000.f);
 	}
 }
 
@@ -568,8 +561,43 @@ void AMyCharacter::MoveToLocation(const FLatentActionInfo& CurrentLatentInfo, co
 			);
 }
 
-template <typename T1, typename T2>
-void AMyCharacter::MyLerp(T1& A, T2 B, const float Alpha)
+void AMyCharacter::SetSpringArmLength(const float NewLength, const float Alpha) const
 {
-	A = FMath::Lerp(A, B, Alpha);
+	SpringArm->TargetArmLength = FMath::Lerp(
+	SpringArm->TargetArmLength,
+	NewLength,
+	Alpha 
+	);
+}
+
+void AMyCharacter::SetSpringArmOffset(const FVector& NewOffset, const float Alpha) const
+{
+	SpringArm->SocketOffset = FMath::Lerp(
+	SpringArm->SocketOffset,
+	NewOffset,
+	Alpha
+	);
+}
+
+void AMyCharacter::SetFieldOfView(const float NewFOV, const float Alpha) const
+{
+	FollowCamera->FieldOfView = FMath::Lerp(
+		FollowCamera->FieldOfView,
+		NewFOV,
+		Alpha
+		);
+}
+
+// void AMyCharacter::FloatLerp(float CurrentValue, const float TargetValue, const float Alpha)
+// {
+// 	CurrentValue = FMath::Lerp(
+// 		CurrentValue,
+// 		TargetValue,
+// 		Alpha);	
+// }
+
+template <typename T1, typename T2>
+void AMyCharacter::MyLerp(T1& CurrentValue, T2 TargetValue, const float Alpha)
+{
+	CurrentValue = FMath::Lerp(CurrentValue, TargetValue, Alpha);
 }

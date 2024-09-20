@@ -9,6 +9,7 @@ class USpringArmComponent;
 class UCameraComponent;
 
 // To do:
+// - Make a fancy function for the floor angle & movement energy
 // - ? Separate camera when sprinting for a long time, or in special areas ?
 // - I have added Velocity length to sprint input. Double check so it doesn't bug. 
 
@@ -113,6 +114,10 @@ public:
 	UPROPERTY(EditDefaultsOnly)
 	float AimingCameraMoveSpeed = 0.3f;
 
+	// Higher is slower
+	UPROPERTY(EditDefaultsOnly)
+	float HookshotSpeed = 1000.f;
+
 	UPROPERTY(EditDefaultsOnly)
 	float JumpImpulseUp = 50000.f;
 
@@ -162,7 +167,7 @@ private:
 	void HandleJumpInput();
 	void HandleSprintInput();
 	void HandleSprintStop();
-	void CheckBackwardJumpEligibility();
+	bool BCanJumpBackwards() const;
 	void CheckWallClimb();
 	void StopClimbing();
 
@@ -177,10 +182,7 @@ private:
 	// Interactions 
 	void LookForHook();
 	void MoveToLocation(const FLatentActionInfo&, const float) const;
-	void SetSpringArmLength(const float, const float) const;
-	void SetSpringArmOffset(const FVector&, const float) const;
-	void SetFieldOfView(const float, const float) const;
-	
-	// Math functions
-	// static float CountSmallestValue(const float a, const float b, const float c);
+
+	template <typename T1, typename T2>
+	static void MyLerp(T1& A, T2 B, const float Alpha);
 };

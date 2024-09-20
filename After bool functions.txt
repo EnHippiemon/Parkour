@@ -44,6 +44,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	CameraMovementOutput();
 	CheckFloorAngle();
 	CheckExhaustion();
+	// CheckBackwardJumpEligibility();
 	CheckWallClimb();
 
 	// Keep last 
@@ -265,8 +266,6 @@ void AMyCharacter::CheckFloorAngle()
 
 void AMyCharacter::CheckExhaustion()
 {
-	float MovementLoss = 0.f;
-	
 	if (MovementEnergy >= 1.f)
 		bIsExhausted = false;
 	
@@ -278,6 +277,24 @@ void AMyCharacter::CheckExhaustion()
 		else 
 			CurrentState = Eps_Walking;
 	}
+	
+	else if (FloorAngle < 0.74f
+		&& MovementEnergy > 0.f
+		&& GetCharacterMovement()->Velocity.Length() > 0.f
+		&& CurrentState == Eps_Sprinting)
+		MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
+		
+	else if (FloorAngle < 0.77f
+		&& MovementEnergy > 0.f
+		&& GetCharacterMovement()->Velocity.Length() > 0.f
+		&& CurrentState == Eps_Sprinting)
+		MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
+	
+	else if (FloorAngle < 0.8f
+		&& MovementEnergy > 0.f
+		&& GetCharacterMovement()->Velocity.Length() > 0.f
+		&& CurrentState == Eps_Sprinting)
+		MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
 
 	// I just wanted some exponential energy drain depending on the floor angle. Above is better though
 	// else if (FloorAngle < 0.8f
@@ -286,64 +303,8 @@ void AMyCharacter::CheckExhaustion()
 	// 	&& CurrentState == Eps_Sprinting)
 	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / FMath::Pow(10, FloorAngle) * 3;
 	//
-	
-	// else if (FloorAngle < 0.74f
-	// 	&& MovementEnergy > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// {
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * 
-	// 	MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	// }
-	
-	else if (FloorAngle < 0.74f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-		
-	else if (FloorAngle < 0.77f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
-	
-	else if (FloorAngle < 0.8f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
-	
-
 	else if (MovementEnergy < 1.f)
 		MovementEnergy += GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	
-	// else if (FloorAngle < 0.74f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	// 	
-	// else if (FloorAngle < 0.77f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
-	//
-	// else if (FloorAngle < 0.8f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
-	//
-	// // I just wanted some exponential energy drain depending on the floor angle. Above is better though
-	// // else if (FloorAngle < 0.8f
-	// // 	&& MovementEnergy > 0.f
-	// // 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// // 	&& CurrentState == Eps_Sprinting)
-	// // 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / FMath::Pow(10, FloorAngle) * 3;
-	// //
-	// else if (MovementEnergy < 1.f)
-	// 	MovementEnergy += GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
 	
 	// Decide movement speed
 	if (FloorAngle == 0.f)
@@ -356,9 +317,6 @@ void AMyCharacter::CheckExhaustion()
 		FloorAngle *= FloorAngle;
 	
 	MovementSpeedPercent = FloorAngle;
-	UE_LOG(LogTemp, Warning, TEXT("MovementLoss: %f"), MovementLoss);
-
-	MovementEnergy -= MovementLoss;
 }
 
 void AMyCharacter::HandleJumpInput()
@@ -372,10 +330,10 @@ void AMyCharacter::HandleJumpInput()
 		return;
 	}
 	
-	if (BCanJumpBackwards() && !GetCharacterMovement()->IsMovingOnGround())
+	if ( IsTurningBackwards() && HasBackwardJumpAngle() && !GetCharacterMovement()->IsMovingOnGround())
 		GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, JumpImpulseUp) + CharacterMovement * JumpImpulseBack);
 	
-	else if (BCanJumpBackwards() && GetCharacterMovement()->IsMovingOnGround())
+	else if (IsTurningBackwards() && HasBackwardJumpAngle() && GetCharacterMovement()->IsMovingOnGround())
 		GetCharacterMovement()->AddImpulse(CharacterMovement * JumpImpulseBack);
 	
 	if (GetCharacterMovement()->IsMovingOnGround() && !bIsExhausted)
@@ -401,10 +359,39 @@ void AMyCharacter::HandleSprintStop()
 	CurrentState = Eps_Walking;
 }
 
-bool AMyCharacter::BCanJumpBackwards() const
+// void AMyCharacter::CheckBackwardJumpEligibility()
+// {
+// 	// // Decides if you can jump backward
+// 	// if (FloorAngle < 0.45f)
+// 	// 	bHasBackwardJumpAngle = true;
+// 	// else
+// 	// 	bHasBackwardJumpAngle = false;
+//
+// 	// // Check vector differences 
+// 	// if (const float VectorDifference = (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
+// 	// 	bIsTurningBackward = true;
+// 	// else
+// 	// 	bIsTurningBackward = false;
+// }
+
+bool AMyCharacter::HasBackwardJumpAngle() const
 {
-	if (FloorAngle < 0.77f && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
+	UE_LOG(LogTemp, Warning, TEXT("has backward angle?"));
+	
+	// Decides if you can jump backward
+	if (FloorAngle < 0.45f)
 		return true;
+
+	return false;
+}
+
+bool AMyCharacter::IsTurningBackwards() const
+{
+	UE_LOG(LogTemp, Warning, TEXT("is turning backwards?"));
+	
+	if ((GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
+		return true;
+
 	return false;
 }
 
