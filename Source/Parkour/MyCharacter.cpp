@@ -88,7 +88,7 @@ void AMyCharacter::PlayerStateSwitch()
 		// What is below is probably useless. Just use the above?
 		MyLerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
 		if (GetCharacterMovement()->Velocity.Length() != 0)
-			MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed);
+			MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed/4);
 		else
 			MyLerp(FollowCamera->FieldOfView, StillFieldOfView, NormalCameraSwitchSpeed);
 		break;
@@ -174,8 +174,12 @@ void AMyCharacter::PlayerStateSwitch()
 		break;
 	}
 
+	if (CurrentState != Eps_Climbing)
+		MyLerp(CurrentCameraOffsetZ, 0.f, NormalCameraSwitchSpeed);
+	
 	if (CurrentState != Eps_Aiming)
-		MyLerp(SpringArm->SocketOffset, FVector(0.f, 0.f, 0.f), NormalCameraSwitchSpeed);
+		MyLerp(SpringArm->SocketOffset, FVector(
+			0.f, CurrentCameraOffsetY, CurrentCameraOffsetZ), NormalCameraSwitchSpeed);
 
 	if (CurrentState != Eps_Idle)
 		MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, 0.001f);
@@ -222,6 +226,7 @@ void AMyCharacter::MovementOutput()
 	}
 	
 	AddMovementInput(CharacterMovement);
+	
 }
 
 void AMyCharacter::CheckFloorAngle()
@@ -356,7 +361,7 @@ void AMyCharacter::CheckExhaustion()
 		FloorAngle *= FloorAngle;
 	
 	MovementSpeedPercent = FloorAngle;
-	UE_LOG(LogTemp, Warning, TEXT("MovementLoss: %f"), MovementLoss);
+	// UE_LOG(LogTemp, Warning, TEXT("MovementLoss: %f"), MovementLoss);
 
 	MovementEnergy -= MovementLoss;
 }
@@ -487,6 +492,32 @@ void AMyCharacter::CameraMovementOutput()
 	
 	AddControllerYawInput(CameraMovement.X * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
 	AddControllerPitchInput(-CameraMovement.Y * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
+
+	if (GetCharacterMovement()->Velocity.Length() > 0.1f)
+	{
+		if ((CharacterMovement.Rotation().Vector() - FollowCamera->GetRightVector()).Length() > 1.8f)
+				SetCurrentOffset(CurrentCameraOffsetY, -CameraYDirectionSpeed, CameraClamp.Y);
+
+		else if ((CharacterMovement.Rotation().Vector() - FollowCamera->GetRightVector()).Length() < 0.8f)
+				SetCurrentOffset(CurrentCameraOffsetY, CameraYDirectionSpeed, CameraClamp.Y);
+
+		if (CurrentState == Eps_Climbing
+		&& (CharacterMovement.Rotation().Vector() - FollowCamera->GetUpVector()).Length() > 1.8f)
+			SetCurrentOffset(CurrentCameraOffsetZ, -CameraYDirectionSpeed, CameraClamp.Z);
+	
+		else if (CurrentState == Eps_Climbing
+		&& (CharacterMovement.Rotation().Vector() - FollowCamera->GetUpVector()).Length() < 0.8f)
+			SetCurrentOffset(CurrentCameraOffsetZ, CameraYDirectionSpeed, CameraClamp.Z);
+	}
+	
+	if (CurrentState == Eps_Climbing)
+		return;
+	
+	if (CameraMovement.X < -0.005f)
+			SetCurrentOffset(CurrentCameraOffsetY, -CameraYDirectionSpeed * 2, CameraClamp.Y);
+
+	else if (CameraMovement.X > 0.005f)
+			SetCurrentOffset(CurrentCameraOffsetY, CameraYDirectionSpeed * 2, CameraClamp.Y);
 }
 
 void AMyCharacter::CheckIdleness()
@@ -497,7 +528,7 @@ void AMyCharacter::CheckIdleness()
 		TimeSinceMoved = 0.f;
 	
 	// Time in seconds before perceived as idle 
-	if (TimeSinceMoved > 5.f && CurrentState != Eps_Idle)
+	if (TimeSinceMoved > TimeBeforeIdle && CurrentState != Eps_Idle)
 	{
 		SavedState = CurrentState;
 		CurrentState = Eps_Idle;
@@ -524,6 +555,12 @@ void AMyCharacter::HandleAimStop()
 	return;
 
 	CurrentState = Eps_LeaveAiming;
+}
+
+void AMyCharacter::SetCurrentOffset(float& Value, const float Speed, const float Clamp) const
+{
+	Value += Speed * GetWorld()->DeltaTimeSeconds;
+	Value = FMath::Clamp(Value, -Clamp, Clamp);
 }
 
 void AMyCharacter::LookForHook()

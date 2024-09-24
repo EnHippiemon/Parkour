@@ -9,9 +9,16 @@ class USpringArmComponent;
 class UCameraComponent;
 
 // To do:
+// - Use SocketOffset to make the player not centered. 
 // - Make a fancy function for the floor angle & movement energy
 // - ? Separate camera when sprinting for a long time, or in special areas ?
 // - I have added Velocity length to sprint input. Double check so it doesn't bug. 
+
+// Camera Offset:
+// - If the character moves towards camera's right vector
+// - Followcamera offsetY -= walk direction related to camera clamped to max value. 
+// - When moving to right of screen, change camera offset to left.
+// - When standing to the left and moving camera to left, change camera offset to right.
 
 // Backward jump implementation:
 // v Use the line tracing for movement speed.
@@ -77,7 +84,15 @@ public:
 		
 	UPROPERTY(EditDefaultsOnly)
 	float AimEnergyDepletionSpeed = 7.5f;
-		
+
+	// Decides how far to the sides the camera can move.
+	UPROPERTY(EditDefaultsOnly)
+	FVector CameraClamp = FVector(0.f, 200.f, 100.f);
+
+	// Decides how quickly the camera moves from side to side. 
+	UPROPERTY(EditDefaultsOnly)
+	float CameraYDirectionSpeed = 1000.f;
+	
 	UPROPERTY(EditDefaultsOnly)
 	float StandardSpringArmLength = 400.f;
 
@@ -127,6 +142,9 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	float MovementEnergy = 1.00f;
 
+	UPROPERTY(EditDefaultsOnly)
+	float TimeBeforeIdle = 15.f;
+
 private:
 	float CharacterMovementForward = 0.f;
 	float CharacterMovementSideways = 0.f;
@@ -141,7 +159,9 @@ private:
 	float CurrentCameraSpeed;
 	float StandardRotationRate = 500.f;
 	float AimRotationRate = 30000.f;
-
+	float CurrentCameraOffsetY = 150.f;
+	float CurrentCameraOffsetZ = 0.f;
+	
 	float HookLength = 1200.f;
 
 	float TimeSinceMoved = 0.f;
@@ -178,6 +198,7 @@ private:
 	void CheckIdleness();
 	void HandleAimInput();
 	void HandleAimStop();
+	void SetCurrentOffset(float& Value, const float Speed, const float Clamp) const;
 
 	// Interactions 
 	void LookForHook();
