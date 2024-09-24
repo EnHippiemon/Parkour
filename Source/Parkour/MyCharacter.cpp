@@ -226,7 +226,6 @@ void AMyCharacter::MovementOutput()
 	}
 	
 	AddMovementInput(CharacterMovement);
-	
 }
 
 void AMyCharacter::CheckFloorAngle()
@@ -489,10 +488,12 @@ void AMyCharacter::CameraMovementOutput()
 	}
 	
 	CameraMovement = FVector2D(MouseMovementX, MouseMovementY);
-	
+
+	// Rotation
 	AddControllerYawInput(CameraMovement.X * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
 	AddControllerPitchInput(-CameraMovement.Y * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
 
+	// Vector offset 
 	if (GetCharacterMovement()->Velocity.Length() > 0.1f)
 	{
 		if ((CharacterMovement.Rotation().Vector() - FollowCamera->GetRightVector()).Length() > 1.8f)
@@ -509,15 +510,25 @@ void AMyCharacter::CameraMovementOutput()
 		&& (CharacterMovement.Rotation().Vector() - FollowCamera->GetUpVector()).Length() < 0.8f)
 			SetCurrentOffset(CurrentCameraOffsetZ, CameraYDirectionSpeed, CameraClamp.Z);
 	}
-	
-	if (CurrentState == Eps_Climbing)
-		return;
+
+	float CameraSpeed;
+	CurrentState == Eps_Climbing ? CameraSpeed = CameraYDirectionSpeed * 2
+	: CameraSpeed = CameraYDirectionSpeed / (CharacterMovement.Length() + 1);
 	
 	if (CameraMovement.X < -0.005f)
-			SetCurrentOffset(CurrentCameraOffsetY, -CameraYDirectionSpeed * 2, CameraClamp.Y);
+			SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
 
 	else if (CameraMovement.X > 0.005f)
-			SetCurrentOffset(CurrentCameraOffsetY, CameraYDirectionSpeed * 2, CameraClamp.Y);
+			SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
+
+	if (CurrentState == Eps_Climbing)
+	{
+		if (CameraMovement.Y < -0.005f)
+				SetCurrentOffset(CurrentCameraOffsetZ, -CameraSpeed, CameraClamp.Z);
+
+		else if (CameraMovement.Y > 0.005f)
+				SetCurrentOffset(CurrentCameraOffsetZ, CameraSpeed, CameraClamp.Z);
+	}
 }
 
 void AMyCharacter::CheckIdleness()

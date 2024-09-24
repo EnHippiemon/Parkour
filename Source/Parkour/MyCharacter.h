@@ -9,7 +9,6 @@ class USpringArmComponent;
 class UCameraComponent;
 
 // To do:
-// - Use SocketOffset to make the player not centered. 
 // - Make a fancy function for the floor angle & movement energy
 // - ? Separate camera when sprinting for a long time, or in special areas ?
 // - I have added Velocity length to sprint input. Double check so it doesn't bug. 
@@ -21,6 +20,11 @@ class UCameraComponent;
 // - When standing to the left and moving camera to left, change camera offset to right.
 
 // Backward jump implementation:
+// NEW IMPLEMENTATION:
+// Linetrace to wall
+// Get the wall's normal vector
+// When jumping (no WASD), jump in the wall's normal vector's forward vector
+// Increase the steepness allowed to backward jump
 // v Use the line tracing for movement speed.
 // v Check if they are shorter than a specific angle.
 // v If they are, you are allowed to do a backward jump.
@@ -29,6 +33,18 @@ class UCameraComponent;
 // This activates a bool bCanJumpBackward
 // Put said bool in the Jump function
 // From the jump function, add velocity (and change direction of character)
+
+// Climbing rotation: 
+// NEW IMPLEMENTATION:
+// While climbing, create a linetrace pointing forward, with an offset based on moving direction
+// Get the normal off the wall using the linetrace
+// Rotate player towards wall normal.
+
+// Ledge climbing:
+// Linetrace above player
+// Look for Ledge actor
+// If found, movetotarget + offset
+// (which target)
 
 // Known issues:
 // - Currently the player automatically stops sprinting after aiming. Otherwise you don't need
