@@ -15,5 +15,5 @@ float UPlayerHUDWidget::CalculateEnergyPercentage()
 	if (!Player)
 		return 0.f;
 
-	return Player->MovementEnergy;
+	return Player->GetMovementEnergy();
 }

@@ -4,6 +4,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "EnHippieUnrealLibrary.h"
 
 AMyCharacter::AMyCharacter()
 {
@@ -31,46 +32,6 @@ AMyCharacter::AMyCharacter()
 	CurrentCameraSpeed = StandardCameraSpeed;
 }
 
-void AMyCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
-void AMyCharacter::Tick(float const DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	MovementOutput();
-	CameraMovementOutput();
-	CheckFloorAngle();
-	CheckExhaustion();
-	CheckWallClimb();
-
-	// Keep last 
-	PlayerStateSwitch();
-
-	// UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
-	// UE_LOG(LogTemp, Warning, TEXT("Saved state: %d"), SavedState.GetValue())
-	// UE_LOG(LogTemp, Warning, TEXT("Player state: %d"), CurrentState.GetValue())
-	}
-
-void AMyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	PlayerInputComponent->BindAxis("Forwards", this, &AMyCharacter::HandleForwardInput);
-	PlayerInputComponent->BindAxis("Sideways", this, &AMyCharacter::HandleSidewaysInput);
-	PlayerInputComponent->BindAxis("MouseX", this, &AMyCharacter::HandleMouseInputX);
-	PlayerInputComponent->BindAxis("MouseY", this, &AMyCharacter::HandleMouseInputY);
-	
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AMyCharacter::HandleJumpInput);
-	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &AMyCharacter::HandleSprintInput);
-	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &AMyCharacter::HandleSprintStop);
-	PlayerInputComponent->BindAction("Aim", IE_Pressed, this, &AMyCharacter::HandleAimInput);
-	PlayerInputComponent->BindAction("Aim", IE_Released, this, &AMyCharacter::HandleAimStop);
-	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMyCharacter::LookForHook);
-	PlayerInputComponent->BindAction("Drop", IE_Pressed, this, &AMyCharacter::StopClimbing);
-}
 
 void AMyCharacter::PlayerStateSwitch()
 {
@@ -88,9 +49,9 @@ void AMyCharacter::PlayerStateSwitch()
 		// What is below is probably useless. Just use the above?
 		MyLerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
 		if (GetCharacterMovement()->Velocity.Length() != 0)
-			MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed/4);
+			MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed/4);
 		else
-			MyLerp(FollowCamera->FieldOfView, StillFieldOfView, NormalCameraSwitchSpeed);
+			MyLerp(FollowCamera->FieldOfView, StillFOV, NormalCameraSwitchSpeed);
 		break;
 
 	case Eps_Sprinting:
@@ -98,7 +59,7 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->SetWalkableFloorAngle(90.f);
 		CheckFloorAngle();
 		MyLerp(SpringArm->TargetArmLength, SprintingSpringArmLength, SpringArmSwitchSpeed);
-		MyLerp(FollowCamera->FieldOfView, SprintingFieldOfView, SprintFOVSpeed);
+		MyLerp(FollowCamera->FieldOfView, SprintingFOV, SprintFOVSpeed);
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
 		break;
@@ -112,8 +73,8 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->bUseControllerDesiredRotation = true;
 		GetCharacterMovement()->RotationRate = FRotator(0.f, AimRotationRate, 0.f);
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.05f);
-		MyLerp(SpringArm->SocketOffset, AimingCameraOffset, AimingCameraMoveSpeed);
-		MyLerp(FollowCamera->FieldOfView, AimingFieldOfView, AimingCameraMoveSpeed);
+		MyLerp(SpringArm->SocketOffset, AimingCameraOffset, AimingCameraTransitionAlpha);
+		MyLerp(FollowCamera->FieldOfView, AimingFOV, AimingCameraTransitionAlpha);
 		break;
 
 	case Eps_LeaveAiming:
@@ -124,18 +85,18 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->bUseControllerDesiredRotation = false;
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
 		MyLerp(SpringArm->TargetArmLength, StopAimingSpringArmLength, NormalCameraSwitchSpeed);
-		MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed);
+		MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
 		
-		if (bIsUsingHookShot)
+		if (bIsUsingHookshot)
 			GetCharacterMovement()->Velocity = FVector(0, 0, 0);
 
-		if (bIsUsingHookShot && (GetActorLocation() - TargetLocation).Length() < 10.f)
-			bIsUsingHookShot = false;
+		if (bIsUsingHookshot && (GetActorLocation() - TargetLocation).Length() < 10.f)
+			bIsUsingHookshot = false;
 
-		if (!bIsUsingHookShot && SavedState == Eps_Sprinting)
+		if (!bIsUsingHookshot && SavedState == Eps_Sprinting)
 			CurrentState = Eps_Walking;
 		
-		else if (!bIsUsingHookShot)
+		else if (!bIsUsingHookshot)
 			CurrentState = SavedState;
 		break;
 
@@ -159,7 +120,7 @@ void AMyCharacter::PlayerStateSwitch()
 		GetCharacterMovement()->MovementMode = MOVE_Flying;
 		GetCharacterMovement()->bOrientRotationToMovement = false;
 		MyLerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
-		MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, NormalCameraSwitchSpeed);
+		MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
 		SpringArm->CameraLagSpeed = 1.f;
 		SpringArm->CameraLagMaxDistance = 10.f;
 
@@ -182,7 +143,7 @@ void AMyCharacter::PlayerStateSwitch()
 			0.f, CurrentCameraOffsetY, CurrentCameraOffsetZ), NormalCameraSwitchSpeed);
 
 	if (CurrentState != Eps_Idle)
-		MyLerp(FollowCamera->FieldOfView, WalkingFieldOfView, 0.001f);
+		MyLerp(FollowCamera->FieldOfView, WalkingFOV, 0.001f);
 }
 
 void AMyCharacter::HandleForwardInput(const float Value)
@@ -436,6 +397,8 @@ void AMyCharacter::CheckWallClimb()
 		&& GetWorld()->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
 		&& GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams()))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Found wall to climb"));
+		
 		if (CurrentState == Eps_Aiming)
 		{
 			SavedState = Eps_Climbing;
@@ -590,13 +553,23 @@ void AMyCharacter::LookForHook()
 
 	if (GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, ECollisionChannel::ECC_GameTraceChannel1, Parameters, FCollisionResponseParams()))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Found hook"));
+		
 		FLatentActionInfo LatentInfo;
 		LatentInfo.CallbackTarget = this;
 		
 		TargetLocation = HookshotTarget.Location - FollowCamera->GetForwardVector() * 50.f - FVector(0, 0, 100.f);
-		bIsUsingHookShot = true;
+		bIsUsingHookshot = true;
 		CurrentState = Eps_LeaveAiming;
-
+		
+		// EnHippieUnrealLibrary::MoveToLocation(
+		// 	this,
+		// 	TargetLocation,
+		// 	FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
+		// 	5,
+		// 	HookshotTarget.Distance/HookshotSpeed,
+		// 	GetWorld()->DeltaTimeSeconds);
+		//
 		MoveToLocation(LatentInfo, HookshotTarget.Distance/HookshotSpeed);
 	}
 }
@@ -620,4 +593,45 @@ template <typename T1, typename T2>
 void AMyCharacter::MyLerp(T1& A, T2 B, const float Alpha)
 {
 	A = FMath::Lerp(A, B, Alpha);
+}
+
+void AMyCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void AMyCharacter::Tick(float const DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	MovementOutput();
+	CameraMovementOutput();
+	CheckFloorAngle();
+	CheckExhaustion();
+	CheckWallClimb();
+
+	// Keep last 
+	PlayerStateSwitch();
+
+	// UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
+	// UE_LOG(LogTemp, Warning, TEXT("Saved state: %d"), SavedState.GetValue())
+	// UE_LOG(LogTemp, Warning, TEXT("Player state: %d"), CurrentState.GetValue())
+}
+
+void AMyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	PlayerInputComponent->BindAxis("Forwards", this, &AMyCharacter::HandleForwardInput);
+	PlayerInputComponent->BindAxis("Sideways", this, &AMyCharacter::HandleSidewaysInput);
+	PlayerInputComponent->BindAxis("MouseX", this, &AMyCharacter::HandleMouseInputX);
+	PlayerInputComponent->BindAxis("MouseY", this, &AMyCharacter::HandleMouseInputY);
+	
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AMyCharacter::HandleJumpInput);
+	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &AMyCharacter::HandleSprintInput);
+	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &AMyCharacter::HandleSprintStop);
+	PlayerInputComponent->BindAction("Aim", IE_Pressed, this, &AMyCharacter::HandleAimInput);
+	PlayerInputComponent->BindAction("Aim", IE_Released, this, &AMyCharacter::HandleAimStop);
+	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMyCharacter::LookForHook);
+	PlayerInputComponent->BindAction("Drop", IE_Pressed, this, &AMyCharacter::StopClimbing);
 }

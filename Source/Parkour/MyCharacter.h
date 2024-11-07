@@ -42,9 +42,11 @@ class UCameraComponent;
 
 // Ledge climbing:
 // Linetrace above player
-// Look for Ledge actor
-// If found, movetotarget + offset
-// (which target)
+// If no collision while climbing, movetotarget
+
+// Movement speed and energy depletion from floor angle:
+// Make the line trace length's max and min values into 0-1
+// Use that to scale both speed and energy depletion seamlessly
 
 // Known issues:
 // - Currently the player automatically stops sprinting after aiming. Otherwise you don't need
@@ -71,155 +73,180 @@ class PARKOUR_API AMyCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-protected:
-	virtual void BeginPlay() override;
-
-	UPROPERTY(VisibleAnywhere)
-	USpringArmComponent* SpringArm;
-
-	UPROPERTY(VisibleAnywhere)
-	UCameraComponent* FollowCamera;
-
-	// Needs to be UPROPERTY if using Blueprints 
-	TEnumAsByte<EPlayerState> CurrentState;
-
-	// Save current state for later 
-	TEnumAsByte<EPlayerState> SavedState;
-	
 public:	
 	AMyCharacter();
-	virtual void Tick(float DeltaTime) override;
 
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-	UPROPERTY(EditDefaultsOnly)
-	float StandardCameraSpeed = 5000.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float AimCameraSpeed = 50000.f;
-		
-	UPROPERTY(EditDefaultsOnly)
-	float AimEnergyDepletionSpeed = 7.5f;
-
-	// Decides how far to the sides the camera can move.
-	UPROPERTY(EditDefaultsOnly)
-	FVector CameraClamp = FVector(0.f, 200.f, 100.f);
-
-	// Decides how quickly the camera moves from side to side. 
-	UPROPERTY(EditDefaultsOnly)
-	float CameraYDirectionSpeed = 1000.f;
+	UFUNCTION(BlueprintCallable)
+	float GetMovementEnergy() { return MovementEnergy; }
 	
-	UPROPERTY(EditDefaultsOnly)
-	float StandardSpringArmLength = 400.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float SprintingSpringArmLength = 600.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float StopAimingSpringArmLength = 400.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float SpringArmSwitchSpeed = 0.05f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float NormalCameraSwitchSpeed = 0.02f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float StillFieldOfView = 60.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float WalkingFieldOfView = 70.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float SprintingFieldOfView = 125.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float SprintFOVSpeed = 0.3f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float AimingFieldOfView = 70.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
-
-	UPROPERTY(EditDefaultsOnly)
-	float AimingCameraMoveSpeed = 0.3f;
-
-	// Higher is slower
-	UPROPERTY(EditDefaultsOnly)
-	float HookshotSpeed = 1000.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float JumpImpulseUp = 50000.f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float JumpImpulseBack = 50000.f;
-
-	UPROPERTY(BlueprintReadOnly)
-	float MovementEnergy = 1.00f;
-
-	UPROPERTY(EditDefaultsOnly)
-	float TimeBeforeIdle = 15.f;
-
 private:
-	float CharacterMovementForward = 0.f;
-	float CharacterMovementSideways = 0.f;
-	float MovementSpeedPercent = 1.00f;
+	/* ---------- VARIABLES ----------- */
 
-	float FloorAngle = 1.00f;
-	float ExhaustionSpeed = 0.5f;
+	/* Camera speed */
+		UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
+		float StandardCameraSpeed = 5000.f;
+		UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
+		float AimCameraSpeed = 50000.f;
+
+	/* Camera position */
+		UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
+		FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
+		
+		// Decides how far to the sides the camera can move.
+		UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
+		FVector CameraClamp = FVector(0.f, 200.f, 100.f);
+
+		float CurrentCameraOffsetY = 150.f;
+		float CurrentCameraOffsetZ = 0.f;
 	
-	float MouseMovementX = 0.f;
-	float MouseMovementY = 0.f;
+	/* Camera positioning speed */ 
+		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+		float AimingCameraTransitionAlpha = 0.3f;
+		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+		float StandardRotationRate = 500.f;
+		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+		float AimRotationRate = 30000.f;
 	
-	float CurrentCameraSpeed;
-	float StandardRotationRate = 500.f;
-	float AimRotationRate = 30000.f;
-	float CurrentCameraOffsetY = 150.f;
-	float CurrentCameraOffsetZ = 0.f;
+		// Decides how quickly the camera moves from side to side. 
+		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+		float CameraYDirectionSpeed = 1000.f;
 	
-	float HookLength = 1200.f;
+		float CurrentCameraSpeed;
 
-	float TimeSinceMoved = 0.f;
-	float CantClimbTimer = 0.f;
+	/* Camera field of view (FOV) */ 
+		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+		float StillFOV = 60.f;
+		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+		float WalkingFOV = 70.f;
+		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+		float SprintingFOV = 125.f;
+		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+		float SprintFOVSpeed = 0.3f;
+		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+		float AimingFOV = 70.f;
 	
-	FVector CharacterMovement;
-	FVector2D CameraMovement;
-	FVector TargetLocation;
+	/* Spring arm length */
+		UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+		float StandardSpringArmLength = 400.f;
+		UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+		float SprintingSpringArmLength = 600.f;
+		UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+		float StopAimingSpringArmLength = 400.f;
 
-	bool bIsExhausted = false;
-	bool bIsUsingHookShot = false;
-	bool bHasBackwardJumpAngle = false;
-	bool bIsTurningBackward = false;
+	/* Spring arm extension speed */ 
+		UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
+		float SpringArmSwitchSpeed = 0.05f;
+		UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
+		float NormalCameraSwitchSpeed = 0.02f;
 
-	void PlayerStateSwitch();
+	/* Hookshot */ 
+		// Higher is slower
+		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+		float HookshotSpeed = 1000.f;
+		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+		float HookLength = 1200.f;
 	
-	// Character movement
-	void HandleForwardInput(const float Value);
-	void HandleSidewaysInput(const float Value);
-	void MovementOutput();
-	void CheckFloorAngle();
-	void CheckExhaustion();
-	void HandleJumpInput();
-	void HandleSprintInput();
-	void HandleSprintStop();
-	bool BCanJumpBackwards() const;
-	void CheckWallClimb();
-	void StopClimbing();
+		bool bIsUsingHookshot = false;
+		FVector TargetLocation;
+	
+	/* Jumping */ 
+		UPROPERTY(EditDefaultsOnly, Category=Jump)
+		float JumpImpulseUp = 50000.f;
+		UPROPERTY(EditDefaultsOnly, Category=Jump)
+		float JumpImpulseBack = 50000.f;
 
-	// Camera movement 
-	void HandleMouseInputX(const float Value);
-	void HandleMouseInputY(const float Value);
-	void CameraMovementOutput();
-	void CheckIdleness();
-	void HandleAimInput();
-	void HandleAimStop();
-	void SetCurrentOffset(float& Value, const float Speed, const float Clamp) const;
+	/* Energy */
+		UPROPERTY(EditDefaultsOnly, Category=Energy)
+		float AimEnergyDepletionSpeed = 7.5f;
+	
+		float MovementEnergy = 1.00f;
+		bool bIsExhausted = false;
+		float MovementSpeedPercent = 1.00f;
+		float FloorAngle = 1.00f;
+		float ExhaustionSpeed = 0.5f;
 
-	// Interactions 
-	void LookForHook();
-	void MoveToLocation(const FLatentActionInfo&, const float) const;
+	/* Climbing */
+		float CantClimbTimer = 0.f;
 
-	template <typename T1, typename T2>
-	static void MyLerp(T1& A, T2 B, const float Alpha);
+	/* Basic movement */
+		/* Idle */
+			UPROPERTY(EditDefaultsOnly, Category=Idle)
+			float TimeBeforeIdle = 15.f;
+
+			float TimeSinceMoved = 0.f;
+
+		/* Basic character movement */ 
+			FVector CharacterMovement;
+			float CharacterMovementForward = 0.f;
+			float CharacterMovementSideways = 0.f;
+		
+		/* Basic camera movement */
+			FVector2D CameraMovement;
+			float MouseMovementX = 0.f;
+			float MouseMovementY = 0.f;
+	
+	/* Player states */ 
+		// Needs to be UPROPERTY if using Blueprints 
+		TEnumAsByte<EPlayerState> CurrentState;
+		// Save current state for later use 
+		TEnumAsByte<EPlayerState> SavedState;
+	
+
+	/* ---------- FUNCTIONS ----------- */
+	
+	/* Player states */
+		void PlayerStateSwitch();
+	
+	/* Character movement */
+		/* Basic character movement */
+			void HandleForwardInput(const float Value);
+			void HandleSidewaysInput(const float Value);
+			void MovementOutput();
+
+		/* Speed changes */
+			void CheckFloorAngle();
+			void CheckExhaustion();
+			void HandleSprintInput();
+			void HandleSprintStop();
+
+		/* Jumping */
+			void HandleJumpInput();
+			bool BCanJumpBackwards() const;
+		
+		/* Climbing */
+			void CheckWallClimb();
+			void StopClimbing();
+
+		/* Movement without input */
+			void MoveToLocation(const FLatentActionInfo&, const float) const;
+
+	/* Camera movement */
+		/* Basic camera movement */
+			void HandleMouseInputX(const float Value);
+			void HandleMouseInputY(const float Value);
+			void CameraMovementOutput();
+
+		/* Camera changes */
+			void CheckIdleness();
+			void HandleAimInput();
+			void HandleAimStop();
+			void SetCurrentOffset(float& Value, const float Speed, const float Clamp) const;
+
+	/* Hookshot */ 
+		void LookForHook();
+
+	/* Static functions */ 
+		template <typename T1, typename T2>
+		static void MyLerp(T1& A, T2 B, const float Alpha);
+
+	/* Inherited functions */
+		virtual void BeginPlay() override;
+		virtual void Tick(float DeltaTime) override;
+		virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	/* Attach components */
+		UPROPERTY(VisibleAnywhere, Category=Camera)
+		USpringArmComponent* SpringArm;
+		UPROPERTY(VisibleAnywhere, Category=Camera)
+		UCameraComponent* FollowCamera;
 };
