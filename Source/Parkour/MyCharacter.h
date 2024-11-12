@@ -61,11 +61,12 @@ enum EPlayerState
 {
 	Eps_Walking,
 	Eps_Sprinting,
+	Eps_Idle,
 	Eps_Aiming,
 	Eps_LeaveAiming,
 	Eps_UseHookshot,
-	Eps_Idle,
-	Eps_Climbing
+	Eps_Climbing,
+	Eps_NoInput
 };
 
 UCLASS()
@@ -145,6 +146,8 @@ private:
 		float HookshotSpeed = 1000.f;
 		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
 		float HookLength = 1200.f;
+		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+		TEnumAsByte<ECollisionChannel> HookCollision;
 	
 		bool bIsUsingHookshot = false;
 		FVector TargetLocation;
@@ -158,15 +161,29 @@ private:
 	/* Energy */
 		UPROPERTY(EditDefaultsOnly, Category=Energy)
 		float AimEnergyDepletionSpeed = 7.5f;
+		UPROPERTY(EditDefaultsOnly, Category=Energy)
+		TEnumAsByte<ECollisionChannel> BlockAllCollision;
+		UPROPERTY(EditDefaultsOnly, Category=Energy)
+		float ExhaustionSpeed = 0.5f;
 	
 		float MovementEnergy = 1.00f;
-		bool bIsExhausted = false;
 		float MovementSpeedPercent = 1.00f;
 		float FloorAngle = 1.00f;
-		float ExhaustionSpeed = 0.5f;
+		bool bIsExhausted = false;
 
 	/* Climbing */
+		UPROPERTY(EditDefaultsOnly, Category=Climbing)
+		TEnumAsByte<ECollisionChannel> ClimbingCollision;
 		float CantClimbTimer = 0.f;
+
+	/* Sprinting */
+		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+		TEnumAsByte<ETraceTypeQuery> ObstacleTraceType;
+		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+		float RunningUpWallSpeed = 20.f;
+	
+		FTimerHandle TimerRunningUpWall;
+		bool bHasReachedWallWhileSprinting = false; 
 
 	/* Basic movement */
 		/* Idle */
@@ -190,7 +207,7 @@ private:
 		TEnumAsByte<EPlayerState> CurrentState;
 		// Save current state for later use 
 		TEnumAsByte<EPlayerState> SavedState;
-	
+
 
 	/* ---------- FUNCTIONS ----------- */
 	
@@ -211,11 +228,16 @@ private:
 
 		/* Jumping */
 			void HandleJumpInput();
+			virtual void Landed(const FHitResult& Hit) override;
 			bool BCanJumpBackwards() const;
+			bool GetIsMidAir() const;
 		
 		/* Climbing */
 			void CheckWallClimb();
 			void StopClimbing();
+
+		/* Running */ 
+			void RunUpToWall();
 
 		/* Movement without input */
 			void MoveToLocation(const FLatentActionInfo&, const float) const;

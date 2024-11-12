@@ -1,10 +1,12 @@
 #include "MyCharacter.h"
 
 #include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "EnHippieUnrealLibrary.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 AMyCharacter::AMyCharacter()
 {
@@ -36,7 +38,7 @@ AMyCharacter::AMyCharacter()
 void AMyCharacter::PlayerStateSwitch()
 {
 	switch (CurrentState)
-	{
+	{		
 	case Eps_Walking:
 		GetCharacterMovement()->MaxWalkSpeed = 600.f * MovementSpeedPercent * MovementEnergy;
 		GetCharacterMovement()->SetWalkableFloorAngle(50.f);
@@ -63,6 +65,21 @@ void AMyCharacter::PlayerStateSwitch()
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
 		break;
+
+	case Eps_Idle:
+		CheckIdleness();
+		AddControllerYawInput(GetWorld()->DeltaTimeSeconds * 2);
+		MyLerp(SpringArm->TargetArmLength, 10000.f, 0.0001f);
+		MyLerp(FollowCamera->FieldOfView, 60.f, 0.0001f);
+		
+		if (SpringArm->GetTargetRotation().Vector().Z > -0.25f)
+			AddControllerPitchInput(GetWorld()->DeltaTimeSeconds / 2);
+		else if (SpringArm->GetTargetRotation().Vector().Z < -0.3f)
+			AddControllerPitchInput(-GetWorld()->DeltaTimeSeconds / 2);
+		
+		if (TimeSinceMoved < 2.f)
+			CurrentState = SavedState;
+		break;
 		
 	case Eps_Aiming:
 		CurrentCameraSpeed = AimCameraSpeed;
@@ -87,7 +104,7 @@ void AMyCharacter::PlayerStateSwitch()
 		MyLerp(SpringArm->TargetArmLength, StopAimingSpringArmLength, NormalCameraSwitchSpeed);
 		MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
 		
-		if (bIsUsingHookshot)
+		if (bIsUsingHookshot || bHasReachedWallWhileSprinting)
 			GetCharacterMovement()->Velocity = FVector(0, 0, 0);
 
 		if (bIsUsingHookshot && (GetActorLocation() - TargetLocation).Length() < 10.f)
@@ -95,24 +112,7 @@ void AMyCharacter::PlayerStateSwitch()
 
 		if (!bIsUsingHookshot && SavedState == Eps_Sprinting)
 			CurrentState = Eps_Walking;
-		
 		else if (!bIsUsingHookshot)
-			CurrentState = SavedState;
-		break;
-
-	case Eps_Idle:
-		CheckIdleness();
-		AddControllerYawInput(GetWorld()->DeltaTimeSeconds * 2);
-		MyLerp(SpringArm->TargetArmLength, 10000.f, 0.0001f);
-		MyLerp(FollowCamera->FieldOfView, 60.f, 0.0001f);
-		
-		if (SpringArm->GetTargetRotation().Vector().Z > -0.25f)
-			AddControllerPitchInput(GetWorld()->DeltaTimeSeconds / 2);
-			
-		else if (SpringArm->GetTargetRotation().Vector().Z < -0.3f)
-			AddControllerPitchInput(-GetWorld()->DeltaTimeSeconds / 2);
-		
-		if (TimeSinceMoved < 2.f)
 			CurrentState = SavedState;
 		break;
 
@@ -164,9 +164,10 @@ void AMyCharacter::MovementOutput()
 		return;
 	}
 
+	// if (bHasReachedWallWhileSprinting)
+	// 	CharacterMovement = FVector(0.f, 0.f, CharacterMovementForward);
 	if (CurrentState != Eps_Climbing)
 		CharacterMovement = FVector(CharacterMovementForward, CharacterMovementSideways, 0.f);
-
 	else
 		CharacterMovement = FVector(0.f, CharacterMovementSideways, CharacterMovementForward);
 	
@@ -179,7 +180,6 @@ void AMyCharacter::MovementOutput()
 		const FRotator YawRotation(0.f, CameraRotation.Yaw, 0.f);
 		CharacterMovement = YawRotation.RotateVector(CharacterMovement);
 	}
-
 	else
 	{
 		// Climb in relation to character's rotation 
@@ -202,25 +202,28 @@ void AMyCharacter::CheckFloorAngle()
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
 
+	auto ForwardTrace = GetWorld()->LineTraceSingleByChannel(HitResultForward, StartFloorAngle, EndForwardAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
+	auto RightTrace = GetWorld()->LineTraceSingleByChannel(HitResultRight, StartFloorAngle, EndRightAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
+	auto LeftTrace = GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartFloorAngle, EndLeftAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
+
 	// If the line trace is null distance = 0. Then setting distance to max so the other ones are shorter. 
-	if (!GetWorld()->LineTraceSingleByChannel(HitResultForward, StartFloorAngle, EndForwardAngle, ECC_GameTraceChannel18, Parameters, FCollisionResponseParams()))
+	if (!ForwardTrace)
 		HitResultForward.Distance = FLT_MAX;
 	
-	if (!GetWorld()->LineTraceSingleByChannel(HitResultRight, StartFloorAngle, EndRightAngle, ECC_GameTraceChannel18, Parameters, FCollisionResponseParams()))
+	if (!RightTrace)
 		HitResultRight.Distance = FLT_MAX;
 	
-	if (!GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartFloorAngle, EndLeftAngle, ECC_GameTraceChannel18, Parameters, FCollisionResponseParams()))
+	if (!LeftTrace)
 		HitResultLeft.Distance = FLT_MAX;
-
-	FloorAngle = FMath::Min3(HitResultForward.Distance, HitResultLeft.Distance, HitResultRight.Distance) / 100.f;
 	
+	FloorAngle = FMath::Min3(HitResultForward.Distance, HitResultLeft.Distance, HitResultRight.Distance) / 100.f;
+
 	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
 	{
 		GetCharacterMovement()->GravityScale = 0.f;
 		GetCharacterMovement()->Velocity = FVector(0.f, 0.f, -250.f);
 		GetCharacterMovement()->JumpZVelocity = 0;
 	}
-
 	else
 	{
 		GetCharacterMovement()->GravityScale = 2.f;
@@ -238,96 +241,66 @@ void AMyCharacter::CheckExhaustion()
 	if (MovementEnergy <= 0.f && !bIsExhausted)
 	{
 		bIsExhausted = true;
-		if (CurrentState == Eps_Aiming)
-			CurrentState = Eps_LeaveAiming;
-		else 
-			CurrentState = Eps_Walking;
+		CurrentState = CurrentState == Eps_Aiming ? Eps_LeaveAiming : Eps_Walking;
 	}
 
-	// I just wanted some exponential energy drain depending on the floor angle. Above is better though
-	// else if (FloorAngle < 0.8f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / FMath::Pow(10, FloorAngle) * 3;
-	//
+	const auto CorrectedFloorAngle = -FloorAngle + 1.007908f;
+	const auto ScaledFloorAngle = UKismetMathLibrary::NormalizeToRange(CorrectedFloorAngle, 0, 0.4f);
+	bool UsingEnergy;
 	
-	// else if (FloorAngle < 0.74f
-	// 	&& MovementEnergy > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// {
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * 
-	// 	MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	// }
+	UE_LOG(LogTemp, Warning, TEXT("Corrected floor: %f | Scaled floor: %f | Floor angle: %f"), CorrectedFloorAngle, ScaledFloorAngle, FloorAngle);
 	
-	else if (FloorAngle < 0.74f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-		
-	else if (FloorAngle < 0.77f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
+	if (MovementEnergy > 0.f &&
+		GetCharacterMovement()->Velocity.Length() > 0.f &&
+		CurrentState == Eps_Sprinting)
+	{
+		if (ScaledFloorAngle > 0.6f)
+		{
+			UsingEnergy = true;
+			MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed * ScaledFloorAngle;			
+		}
+		else
+			UsingEnergy = false;
+	}
+	else
+		UsingEnergy = false;
 	
-	else if (FloorAngle < 0.8f
-		&& MovementEnergy > 0.f
-		&& GetCharacterMovement()->Velocity.Length() > 0.f
-		&& CurrentState == Eps_Sprinting)
-		MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
-	
-
-	else if (MovementEnergy < 1.f)
+	if (MovementEnergy < 1.f && !UsingEnergy)
 		MovementEnergy += GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
 	
-	// else if (FloorAngle < 0.74f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	// 	
-	// else if (FloorAngle < 0.77f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 2;
-	//
-	// else if (FloorAngle < 0.8f
-	// 	&& MovementEnergy > 0.f
-	// 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// 	&& CurrentState == Eps_Sprinting)
-	// 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / 4;
-	//
-	// // I just wanted some exponential energy drain depending on the floor angle. Above is better though
-	// // else if (FloorAngle < 0.8f
-	// // 	&& MovementEnergy > 0.f
-	// // 	&& GetCharacterMovement()->Velocity.Length() > 0.f
-	// // 	&& CurrentState == Eps_Sprinting)
-	// // 	MovementEnergy -= GetWorld()->DeltaTimeSeconds * ExhaustionSpeed / FMath::Pow(10, FloorAngle) * 3;
-	// //
-	// else if (MovementEnergy < 1.f)
-	// 	MovementEnergy += GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
-	
 	// Decide movement speed
+	if (GetIsMidAir())
+		return;
+
+	// TO DO: Can this be removed? 
 	if (FloorAngle == 0.f)
 		FloorAngle = 1.f;
-
 	else if (FloorAngle < 0.8f)
-		FloorAngle = FloorAngle * FloorAngle * FloorAngle;
-	
+		FloorAngle = FloorAngle * FloorAngle * FloorAngle;	
 	else if (FloorAngle < 1.f)
 		FloorAngle *= FloorAngle;
-	
-	MovementSpeedPercent = FloorAngle;
-	// UE_LOG(LogTemp, Warning, TEXT("MovementLoss: %f"), MovementLoss);
+
+	// Flip 0 and 1 so movement speed is increased with higher value. 
+	MovementSpeedPercent = FMath::Clamp(ScaledFloorAngle * - 1 + 1, 0, 2);
 
 	MovementEnergy -= MovementLoss;
 }
 
 void AMyCharacter::HandleJumpInput()
 {
+	// When running up wall 
+	if (CurrentState != Eps_LeaveAiming && FloorAngle < 0.9f && bHasReachedWallWhileSprinting)
+	{
+		// Interrupt running
+		FLatentActionManager LatentActionManager = GetWorld()->GetLatentActionManager();
+		LatentActionManager.RemoveActionsForObject(this);
+
+		// Jump in backward direction 
+		GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, JumpImpulseUp) - GetActorForwardVector() * JumpImpulseBack);
+		bHasReachedWallWhileSprinting = false;
+		return;
+	}
+	
 	if (CurrentState == Eps_Climbing && MovementEnergy > 0.f && CantClimbTimer >= 1.f)
 	{
 		CantClimbTimer = 0.5f;
@@ -339,7 +312,6 @@ void AMyCharacter::HandleJumpInput()
 	
 	if (BCanJumpBackwards() && !GetCharacterMovement()->IsMovingOnGround())
 		GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, JumpImpulseUp) + CharacterMovement * JumpImpulseBack);
-	
 	else if (BCanJumpBackwards() && GetCharacterMovement()->IsMovingOnGround())
 		GetCharacterMovement()->AddImpulse(CharacterMovement * JumpImpulseBack);
 	
@@ -348,6 +320,13 @@ void AMyCharacter::HandleJumpInput()
 		MovementEnergy -= 0.3f;
 		Jump();
 	}
+}
+
+void AMyCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+
+	bHasReachedWallWhileSprinting = false;
 }
 
 void AMyCharacter::HandleSprintInput()
@@ -373,6 +352,11 @@ bool AMyCharacter::BCanJumpBackwards() const
 	return false;
 }
 
+bool AMyCharacter::GetIsMidAir() const
+{
+	return GetCharacterMovement()->Velocity.Z == 0 ? 0 : 1;
+}
+
 void AMyCharacter::CheckWallClimb()
 {
 	if (CantClimbTimer < 1.f)
@@ -392,10 +376,12 @@ void AMyCharacter::CheckWallClimb()
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
 
+	auto ForwardTrace = GetWorld()->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
+	auto RightTrace = GetWorld()->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
+	auto LeftTrace = GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
+
 	// Check if all LineTraces find the climbing wall. 
-	if (GetWorld()->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
-		&& GetWorld()->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams())
-		&& GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ECC_GameTraceChannel2, Parameters, FCollisionResponseParams()))
+	if (ForwardTrace && RightTrace && LeftTrace)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Found wall to climb"));
 		
@@ -551,7 +537,8 @@ void AMyCharacter::LookForHook()
 
 	DrawDebugLine(GetWorld(), StartHookSearch, EndHookSearch, FColor::Purple, false, 0.1f, 0.f, 3.f);
 
-	if (GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, ECollisionChannel::ECC_GameTraceChannel1, Parameters, FCollisionResponseParams()))
+	auto HookTrace = GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, HookCollision, Parameters, FCollisionResponseParams());
+	if (HookTrace)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Found hook"));
 		
@@ -577,16 +564,76 @@ void AMyCharacter::LookForHook()
 void AMyCharacter::MoveToLocation(const FLatentActionInfo& CurrentLatentInfo, const float Duration) const
 {
 	UKismetSystemLibrary::MoveComponentTo(
-			RootComponent,
-			TargetLocation,
-			FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
+		RootComponent,
+		TargetLocation,
+		FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
+		false,
+		false,
+		Duration,
+		false,
+		EMoveComponentAction::Move,
+		CurrentLatentInfo
+		);
+}
+
+void AMyCharacter::RunUpToWall()
+{
+	if (CurrentState != Eps_Sprinting)
+		return;
+	if (bHasReachedWallWhileSprinting)
+		return;
+	if (GetIsMidAir())
+		return;
+	
+	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	FVector TraceStart = GetActorLocation();
+	FVector TraceEnd = GetActorLocation() + GetActorForwardVector() * 40.f;
+	
+	const auto LookForWall = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
+	if (LookForWall)
+	{
+		FHitResult CapsuleHitResult;
+		FVector CapsuleTraceEnd = GetActorLocation() + /*HitResult.ImpactNormal.UpVector */ GetActorUpVector() * 200.f;
+		
+		auto CapsuleTrace = UKismetSystemLibrary::CapsuleTraceSingle(
+			GetWorld(),
+			TraceStart,
+			CapsuleTraceEnd,
+			GetCapsuleComponent()->GetScaledCapsuleRadius(),
+			GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
+			ObstacleTraceType,
 			false,
-			false,
-			Duration,
-			false,
-			EMoveComponentAction::Move,
-			CurrentLatentInfo
+			{this},
+			EDrawDebugTrace::ForDuration,
+			CapsuleHitResult,
+			true,
+			FLinearColor::Red,
+			FLinearColor::Green,
+			1.f
 			);
+		
+		if (!CapsuleTrace)
+		{
+			bHasReachedWallWhileSprinting = true;
+			
+			FLatentActionInfo LatentActionInfo;
+			LatentActionInfo.CallbackTarget = this;
+			
+			UKismetSystemLibrary::MoveComponentTo(
+				RootComponent,
+				CapsuleTraceEnd,
+				GetActorRotation()/*HitResult.Normal.ForwardVector.Rotation()*/,
+				true,
+				false,
+				RunningUpWallSpeed,
+				false,
+				EMoveComponentAction::Move,
+				LatentActionInfo
+				);
+		}
+	}
 }
 
 template <typename T1, typename T2>
@@ -609,6 +656,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	CheckFloorAngle();
 	CheckExhaustion();
 	CheckWallClimb();
+	RunUpToWall();
 
 	// Keep last 
 	PlayerStateSwitch();
@@ -616,6 +664,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	// UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
 	// UE_LOG(LogTemp, Warning, TEXT("Saved state: %d"), SavedState.GetValue())
 	// UE_LOG(LogTemp, Warning, TEXT("Player state: %d"), CurrentState.GetValue())
+	// UE_LOG(LogTemp, Warning, TEXT("FoundWall: %hhd"), bHasReachedWallWhileSprinting)
 }
 
 void AMyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
