@@ -180,10 +180,19 @@ private:
 		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
 		TEnumAsByte<ETraceTypeQuery> ObstacleTraceType;
 		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+		float DistanceBeforeAbleToRunUpWall = 300.f;
+		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
 		float RunningUpWallSpeed = 20.f;
+		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+		float DistanceToRunUpWall = 200.f;
 	
 		FTimerHandle TimerRunningUpWall;
-		bool bHasReachedWallWhileSprinting = false; 
+		FVector RunningUpWallEndLocation; 
+		bool bIsNearingWall = false;
+		bool bHasReachedWallWhileSprinting = false;
+
+	/* Movement without input */
+		FLatentActionInfo LatentActionInfo;
 
 	/* Basic movement */
 		/* Idle */
@@ -225,6 +234,7 @@ private:
 			void CheckExhaustion();
 			void HandleSprintInput();
 			void HandleSprintStop();
+			void SetPlayerVelocity(FVector Velocity);
 
 		/* Jumping */
 			void HandleJumpInput();
@@ -238,6 +248,7 @@ private:
 
 		/* Running */ 
 			void RunUpToWall();
+			void RunningUpWall();
 
 		/* Movement without input */
 			void MoveToLocation(const FLatentActionInfo&, const float) const;

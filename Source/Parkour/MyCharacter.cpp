@@ -103,9 +103,6 @@ void AMyCharacter::PlayerStateSwitch()
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
 		MyLerp(SpringArm->TargetArmLength, StopAimingSpringArmLength, NormalCameraSwitchSpeed);
 		MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
-		
-		if (bIsUsingHookshot || bHasReachedWallWhileSprinting)
-			GetCharacterMovement()->Velocity = FVector(0, 0, 0);
 
 		if (bIsUsingHookshot && (GetActorLocation() - TargetLocation).Length() < 10.f)
 			bIsUsingHookshot = false;
@@ -134,7 +131,10 @@ void AMyCharacter::PlayerStateSwitch()
 		CurrentState = Eps_Walking;
 		break;
 	}
-
+			
+	if (bIsUsingHookshot || bHasReachedWallWhileSprinting)
+		GetCharacterMovement()->Velocity = FVector(0, 0, 0);
+	
 	if (CurrentState != Eps_Climbing)
 		MyLerp(CurrentCameraOffsetZ, 0.f, NormalCameraSwitchSpeed);
 	
@@ -248,7 +248,7 @@ void AMyCharacter::CheckExhaustion()
 	const auto ScaledFloorAngle = UKismetMathLibrary::NormalizeToRange(CorrectedFloorAngle, 0, 0.4f);
 	bool UsingEnergy;
 	
-	UE_LOG(LogTemp, Warning, TEXT("Corrected floor: %f | Scaled floor: %f | Floor angle: %f"), CorrectedFloorAngle, ScaledFloorAngle, FloorAngle);
+	// UE_LOG(LogTemp, Warning, TEXT("Corrected floor: %f | Scaled floor: %f | Floor angle: %f"), CorrectedFloorAngle, ScaledFloorAngle, FloorAngle);
 	
 	if (MovementEnergy > 0.f &&
 		GetCharacterMovement()->Velocity.Length() > 0.f &&
@@ -289,7 +289,7 @@ void AMyCharacter::CheckExhaustion()
 void AMyCharacter::HandleJumpInput()
 {
 	// When running up wall 
-	if (CurrentState != Eps_LeaveAiming && FloorAngle < 0.9f && bHasReachedWallWhileSprinting)
+	if (CurrentState != Eps_LeaveAiming && FloorAngle < 2.f && bHasReachedWallWhileSprinting)
 	{
 		// Interrupt running
 		FLatentActionManager LatentActionManager = GetWorld()->GetLatentActionManager();
@@ -511,7 +511,7 @@ void AMyCharacter::HandleAimInput()
 
 void AMyCharacter::HandleAimStop()
 {
-	if (CurrentState == Eps_Idle)
+	if (CurrentState != Eps_Aiming)
 	return;
 
 	CurrentState = Eps_LeaveAiming;
@@ -540,10 +540,8 @@ void AMyCharacter::LookForHook()
 	auto HookTrace = GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, HookCollision, Parameters, FCollisionResponseParams());
 	if (HookTrace)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Found hook"));
-		
-		FLatentActionInfo LatentInfo;
-		LatentInfo.CallbackTarget = this;
+		// FLatentActionInfo LatentInfo;
+		// LatentInfo.CallbackTarget = this;
 		
 		TargetLocation = HookshotTarget.Location - FollowCamera->GetForwardVector() * 50.f - FVector(0, 0, 100.f);
 		bIsUsingHookshot = true;
@@ -557,24 +555,36 @@ void AMyCharacter::LookForHook()
 		// 	HookshotTarget.Distance/HookshotSpeed,
 		// 	GetWorld()->DeltaTimeSeconds);
 		//
-		MoveToLocation(LatentInfo, HookshotTarget.Distance/HookshotSpeed);
+		UKismetSystemLibrary::MoveComponentTo(
+			RootComponent,
+			TargetLocation,
+			FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
+			false,
+			false,
+			HookshotTarget.Distance/HookshotSpeed,
+			false,
+			EMoveComponentAction::Move,
+			LatentActionInfo
+			);
+		
+		// MoveToLocation(LatentInfo, HookshotTarget.Distance/HookshotSpeed);
 	}
 }
 
-void AMyCharacter::MoveToLocation(const FLatentActionInfo& CurrentLatentInfo, const float Duration) const
-{
-	UKismetSystemLibrary::MoveComponentTo(
-		RootComponent,
-		TargetLocation,
-		FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
-		false,
-		false,
-		Duration,
-		false,
-		EMoveComponentAction::Move,
-		CurrentLatentInfo
-		);
-}
+// void AMyCharacter::MoveToLocation(const FLatentActionInfo& CurrentLatentInfo, const float Duration) const
+// {
+// 	UKismetSystemLibrary::MoveComponentTo(
+// 		RootComponent,
+// 		TargetLocation,
+// 		FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
+// 		false,
+// 		false,
+// 		Duration,
+// 		false,
+// 		EMoveComponentAction::Move,
+// 		CurrentLatentInfo
+// 		);
+// }
 
 void AMyCharacter::RunUpToWall()
 {
@@ -582,25 +592,65 @@ void AMyCharacter::RunUpToWall()
 		return;
 	if (bHasReachedWallWhileSprinting)
 		return;
-	if (GetIsMidAir())
+	// if (GetIsMidAir())
+	// 	return;
+	if (GetVelocity().Z < 0)
+	{
+		bIsNearingWall = false;
 		return;
-	
-	FHitResult HitResult;
+	}
+
+	FHitResult DistancedLookForWallHitResult;
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(this);
-	FVector TraceStart = GetActorLocation();
-	FVector TraceEnd = GetActorLocation() + GetActorForwardVector() * 40.f;
+	const FVector TraceStart = GetActorLocation();
+	const FVector DistancedLookForWallEnd = GetActorLocation() + GetActorForwardVector() * DistanceBeforeAbleToRunUpWall;	
+	const auto DistancedLookForWall = GetWorld()->LineTraceSingleByChannel(DistancedLookForWallHitResult, TraceStart, DistancedLookForWallEnd, BlockAllCollision, Params, FCollisionResponseParams());
+
+	if (!DistancedLookForWall)
+		bIsNearingWall = false;
 	
-	const auto LookForWall = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
+	FHitResult DistanceCapsuleHitResult;
+	const FVector DistancedTraceEnd = DistancedLookForWallEnd - GetActorForwardVector() * 50;
+
+	const auto DistancedCapsuleTrace = UKismetSystemLibrary::CapsuleTraceSingle(
+		GetWorld(),
+		TraceStart,
+		DistancedTraceEnd,
+		GetCapsuleComponent()->GetScaledCapsuleRadius(),
+		GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
+		ObstacleTraceType,
+		false,
+		{this},
+		EDrawDebugTrace::ForDuration,
+		DistanceCapsuleHitResult,
+		true,
+		FLinearColor::Red,
+		FLinearColor::Green,
+		1.f
+		);
+
+	if (DistancedLookForWall && !DistancedCapsuleTrace)
+		bIsNearingWall = true;
+	
+	// UE_LOG(LogTemp, Warning, TEXT("Velocity: %f"), GetCharacterMovement()->Velocity.Length())
+
+	if (!bIsNearingWall)
+		return;
+	
+	FHitResult ShortWallSearchHitResult;
+	const FVector TraceEnd = GetActorLocation() + GetActorForwardVector() * 40.f;
+	
+	const auto LookForWall = GetWorld()->LineTraceSingleByChannel(ShortWallSearchHitResult, TraceStart, TraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
 	if (LookForWall)
 	{
 		FHitResult CapsuleHitResult;
-		FVector CapsuleTraceEnd = GetActorLocation() + /*HitResult.ImpactNormal.UpVector */ GetActorUpVector() * 200.f;
+		RunningUpWallEndLocation = GetActorLocation() + /*HitResult.ImpactNormal.UpVector */ GetActorUpVector() * 200.f;
 		
 		auto CapsuleTrace = UKismetSystemLibrary::CapsuleTraceSingle(
 			GetWorld(),
 			TraceStart,
-			CapsuleTraceEnd,
+			RunningUpWallEndLocation,
 			GetCapsuleComponent()->GetScaledCapsuleRadius(),
 			GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
 			ObstacleTraceType,
@@ -617,13 +667,11 @@ void AMyCharacter::RunUpToWall()
 		if (!CapsuleTrace)
 		{
 			bHasReachedWallWhileSprinting = true;
-			
-			FLatentActionInfo LatentActionInfo;
-			LatentActionInfo.CallbackTarget = this;
-			
+			bIsNearingWall = false;
+						
 			UKismetSystemLibrary::MoveComponentTo(
 				RootComponent,
-				CapsuleTraceEnd,
+				RunningUpWallEndLocation,
 				GetActorRotation()/*HitResult.Normal.ForwardVector.Rotation()*/,
 				true,
 				false,
@@ -636,6 +684,15 @@ void AMyCharacter::RunUpToWall()
 	}
 }
 
+void AMyCharacter::RunningUpWall()
+{			
+	if (bHasReachedWallWhileSprinting)
+		GetCharacterMovement()->Velocity = FVector(0, 0, 0);
+
+	if (UKismetMathLibrary::Vector_Distance(GetActorLocation(), RunningUpWallEndLocation) < 10.f)
+		bHasReachedWallWhileSprinting = false;
+}
+
 template <typename T1, typename T2>
 void AMyCharacter::MyLerp(T1& A, T2 B, const float Alpha)
 {
@@ -645,6 +702,8 @@ void AMyCharacter::MyLerp(T1& A, T2 B, const float Alpha)
 void AMyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	LatentActionInfo.CallbackTarget = this;
 }
 
 void AMyCharacter::Tick(float const DeltaTime)
@@ -654,14 +713,19 @@ void AMyCharacter::Tick(float const DeltaTime)
 	MovementOutput();
 	CameraMovementOutput();
 	CheckFloorAngle();
+	
+	/* Climbing */
 	CheckExhaustion();
 	CheckWallClimb();
+	
+	/* Running */
 	RunUpToWall();
+	RunningUpWall();
 
 	// Keep last 
 	PlayerStateSwitch();
 
-	// UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
+	UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
 	// UE_LOG(LogTemp, Warning, TEXT("Saved state: %d"), SavedState.GetValue())
 	// UE_LOG(LogTemp, Warning, TEXT("Player state: %d"), CurrentState.GetValue())
 	// UE_LOG(LogTemp, Warning, TEXT("FoundWall: %hhd"), bHasReachedWallWhileSprinting)
