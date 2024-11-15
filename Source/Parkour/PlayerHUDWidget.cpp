@@ -1,6 +1,6 @@
 #include "PlayerHUDWidget.h"
 
-#include "MyCharacter.h"
+#include "Characters/MyCharacter.h"
 #include "Kismet/GameplayStatics.h"
 
 void UPlayerHUDWidget::NativeConstruct()

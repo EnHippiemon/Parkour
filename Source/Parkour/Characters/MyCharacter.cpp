@@ -10,68 +10,81 @@
 
 AMyCharacter::AMyCharacter()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	SpringArm = CreateDefaultSubobject<USpringArmComponent>("SpringArm");
-	SpringArm->SetupAttachment(RootComponent);
-	SpringArm->bUsePawnControlRotation = true;
-	SpringArm->bEnableCameraRotationLag = true;
-	SpringArm->CameraRotationLagSpeed = 50.f;
-	SpringArm->CameraLagSpeed = 20.f;
-	SpringArm->CameraLagMaxDistance = 3.f;
-
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
-	FollowCamera->SetupAttachment(SpringArm);
-	FollowCamera->bUsePawnControlRotation = false;
-
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->bUseControllerDesiredRotation = false;
-	GetCharacterMovement()->AirControl = 0.3f;
-
-	bUseControllerRotationPitch = false;
-	bUseControllerRotationRoll = false;
-	bUseControllerRotationYaw = false;
-
 	CurrentCameraSpeed = StandardCameraSpeed;
 }
 
-
 void AMyCharacter::PlayerStateSwitch()
 {
+	// Checks state once when it has changed 
+	if (CurrentState != PreviousState)
+	{
+		switch (CurrentState)
+		{
+		case Eps_Walking:
+			GetCharacterMovement()->SetWalkableFloorAngle(50.f);
+			SpringArm->CameraLagSpeed = 20.f;
+			SpringArm->CameraLagMaxDistance = 3.f;
+			GetCharacterMovement()->bOrientRotationToMovement = true;
+			break;
+		case Eps_Sprinting:
+			GetCharacterMovement()->SetWalkableFloorAngle(90.f);
+			break;
+		case Eps_Idle:
+			break;
+		case Eps_Aiming:
+			CurrentCameraSpeed = AimCameraSpeed;
+			SpringArm->CameraRotationLagSpeed = 1000.f;
+			GetCharacterMovement()->bOrientRotationToMovement = false;
+			GetCharacterMovement()->bUseControllerDesiredRotation = true;
+			GetCharacterMovement()->RotationRate = FRotator(0.f, AimRotationRate, 0.f);
+			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.05f);
+			break;
+		case Eps_LeaveAiming:
+			SpringArm->CameraRotationLagSpeed = 50.f;
+			CurrentCameraSpeed = StandardCameraSpeed;
+			GetCharacterMovement()->RotationRate = FRotator(0.f, StandardRotationRate, 0.f);
+			GetCharacterMovement()->bOrientRotationToMovement = true;
+			GetCharacterMovement()->bUseControllerDesiredRotation = false;
+			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
+			break;
+		case Eps_Climbing:
+			GetCharacterMovement()->MovementMode = MOVE_Flying;
+			GetCharacterMovement()->bOrientRotationToMovement = false;
+			SpringArm->CameraLagSpeed = 1.f;
+			SpringArm->CameraLagMaxDistance = 10.f;
+			break;
+		default:
+			UE_LOG(LogTemp, Error, TEXT("No active Player State. Now Walking"))
+		}	
+	}
+	PreviousState = CurrentState;
+
+	// Checks state every tick  
 	switch (CurrentState)
 	{		
 	case Eps_Walking:
-		GetCharacterMovement()->MaxWalkSpeed = 600.f * MovementSpeedPercent * MovementEnergy;
-		GetCharacterMovement()->SetWalkableFloorAngle(50.f);
-		SpringArm->CameraLagSpeed = 20.f;
-		SpringArm->CameraLagMaxDistance = 3.f;
-		GetCharacterMovement()->bOrientRotationToMovement = true;
 		CheckFloorAngle();
 		CheckIdleness();
-		// SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
-		// What is below is probably useless. Just use the above?
-		MyLerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
+		GetCharacterMovement()->MaxWalkSpeed = 600.f * MovementSpeedPercent * MovementEnergy;
+		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
 		if (GetCharacterMovement()->Velocity.Length() != 0)
-			MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed/4);
+			FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed/4);
 		else
-			MyLerp(FollowCamera->FieldOfView, StillFOV, NormalCameraSwitchSpeed);
+			FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, StillFOV, NormalCameraSwitchSpeed);
 		break;
-
 	case Eps_Sprinting:
-		GetCharacterMovement()->MaxWalkSpeed = 1000.f * MovementSpeedPercent * MovementEnergy;
-		GetCharacterMovement()->SetWalkableFloorAngle(90.f);
 		CheckFloorAngle();
-		MyLerp(SpringArm->TargetArmLength, SprintingSpringArmLength, SpringArmSwitchSpeed);
-		MyLerp(FollowCamera->FieldOfView, SprintingFOV, SprintFOVSpeed);
+		GetCharacterMovement()->MaxWalkSpeed = 1000.f * MovementSpeedPercent * MovementEnergy;
+		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, SprintingSpringArmLength, SpringArmSwitchSpeed);
+		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, SprintingFOV, SprintFOVSpeed);
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
 		break;
-
 	case Eps_Idle:
 		CheckIdleness();
 		AddControllerYawInput(GetWorld()->DeltaTimeSeconds * 2);
-		MyLerp(SpringArm->TargetArmLength, 10000.f, 0.0001f);
-		MyLerp(FollowCamera->FieldOfView, 60.f, 0.0001f);
-		
+		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, 10000.f, 0.0001f);
+		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, 60.f, 0.0001f);
 		if (SpringArm->GetTargetRotation().Vector().Z > -0.25f)
 			AddControllerPitchInput(GetWorld()->DeltaTimeSeconds / 2);
 		else if (SpringArm->GetTargetRotation().Vector().Z < -0.3f)
@@ -79,31 +92,16 @@ void AMyCharacter::PlayerStateSwitch()
 		
 		if (TimeSinceMoved < 2.f)
 			CurrentState = SavedState;
-		break;
-		
+		break;		
 	case Eps_Aiming:
-		CurrentCameraSpeed = AimCameraSpeed;
-		SpringArm->CameraRotationLagSpeed = 1000.f;
 		MovementEnergy -= GetWorld()->DeltaTimeSeconds * AimEnergyDepletionSpeed;
-		MyLerp(SpringArm->TargetArmLength, 100.f, 0.3f);
-		GetCharacterMovement()->bOrientRotationToMovement = false;
-		GetCharacterMovement()->bUseControllerDesiredRotation = true;
-		GetCharacterMovement()->RotationRate = FRotator(0.f, AimRotationRate, 0.f);
-		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.05f);
-		MyLerp(SpringArm->SocketOffset, AimingCameraOffset, AimingCameraTransitionAlpha);
-		MyLerp(FollowCamera->FieldOfView, AimingFOV, AimingCameraTransitionAlpha);
+		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, 100.f, 0.3f);
+		SpringArm->SocketOffset = FMath::Lerp(SpringArm->SocketOffset, AimingCameraOffset, AimingCameraTransitionAlpha);
+		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, AimingFOV, AimingCameraTransitionAlpha);
 		break;
-
 	case Eps_LeaveAiming:
-		SpringArm->CameraRotationLagSpeed = 50.f;
-		CurrentCameraSpeed = StandardCameraSpeed;
-		GetCharacterMovement()->RotationRate = FRotator(0.f, StandardRotationRate, 0.f);
-		GetCharacterMovement()->bOrientRotationToMovement = true;
-		GetCharacterMovement()->bUseControllerDesiredRotation = false;
-		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
-		MyLerp(SpringArm->TargetArmLength, StopAimingSpringArmLength, NormalCameraSwitchSpeed);
-		MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
-
+		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StopAimingSpringArmLength, NormalCameraSwitchSpeed);
+		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
 		if (bIsUsingHookshot && (GetActorLocation() - TargetLocation).Length() < 10.f)
 			bIsUsingHookshot = false;
 
@@ -112,20 +110,13 @@ void AMyCharacter::PlayerStateSwitch()
 		else if (!bIsUsingHookshot)
 			CurrentState = SavedState;
 		break;
-
 	case Eps_Climbing:
-		GetCharacterMovement()->MovementMode = MOVE_Flying;
-		GetCharacterMovement()->bOrientRotationToMovement = false;
-		MyLerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
-		MyLerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
-		SpringArm->CameraLagSpeed = 1.f;
-		SpringArm->CameraLagMaxDistance = 10.f;
-
+		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
+		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
 		// Makes sure that the player is pushed to the wall and doesn't fall off
 		if (CantClimbTimer >= 1.f)
 			GetCharacterMovement()->AddImpulse(GetActorForwardVector() * 1000.f);
-		break;
-		
+		break;		
 	default:
 		UE_LOG(LogTemp, Error, TEXT("No active Player State. Now Walking"))
 		CurrentState = Eps_Walking;
@@ -133,27 +124,17 @@ void AMyCharacter::PlayerStateSwitch()
 	}
 			
 	if (bIsUsingHookshot || bHasReachedWallWhileSprinting)
-		GetCharacterMovement()->Velocity = FVector(0, 0, 0);
+		SetPlayerVelocity(FVector(0, 0, 0));
 	
 	if (CurrentState != Eps_Climbing)
-		MyLerp(CurrentCameraOffsetZ, 0.f, NormalCameraSwitchSpeed);
+		CurrentCameraOffsetZ = FMath::Lerp(CurrentCameraOffsetZ, 0.f, NormalCameraSwitchSpeed);
 	
 	if (CurrentState != Eps_Aiming)
-		MyLerp(SpringArm->SocketOffset, FVector(
+		SpringArm->SocketOffset = FMath::Lerp(SpringArm->SocketOffset, FVector(
 			0.f, CurrentCameraOffsetY, CurrentCameraOffsetZ), NormalCameraSwitchSpeed);
 
 	if (CurrentState != Eps_Idle)
-		MyLerp(FollowCamera->FieldOfView, WalkingFOV, 0.001f);
-}
-
-void AMyCharacter::HandleForwardInput(const float Value)
-{
-	CharacterMovementForward = Value * GetWorld()->DeltaTimeSeconds;
-}
-
-void AMyCharacter::HandleSidewaysInput(const float Value)
-{
-	CharacterMovementSideways = Value * GetWorld()->DeltaTimeSeconds;
+		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, WalkingFOV, 0.001f);
 }
 
 void AMyCharacter::MovementOutput()
@@ -164,12 +145,10 @@ void AMyCharacter::MovementOutput()
 		return;
 	}
 
-	// if (bHasReachedWallWhileSprinting)
-	// 	CharacterMovement = FVector(0.f, 0.f, CharacterMovementForward);
 	if (CurrentState != Eps_Climbing)
-		CharacterMovement = FVector(CharacterMovementForward, CharacterMovementSideways, 0.f);
+		CharacterMovement = FVector(GetMovementForward(), GetMovementSideways(), 0.f);
 	else
-		CharacterMovement = FVector(0.f, CharacterMovementSideways, CharacterMovementForward);
+		CharacterMovement = FVector(0.f, GetMovementSideways(), GetMovementForward());
 	
 	CharacterMovement.Normalize();
 
@@ -187,6 +166,11 @@ void AMyCharacter::MovementOutput()
 	}
 	
 	AddMovementInput(CharacterMovement);
+}
+
+void AMyCharacter::SetPlayerVelocity(const FVector& Value) const
+{
+	GetCharacterMovement()->Velocity = Value;
 }
 
 void AMyCharacter::CheckFloorAngle()
@@ -208,11 +192,9 @@ void AMyCharacter::CheckFloorAngle()
 
 	// If the line trace is null distance = 0. Then setting distance to max so the other ones are shorter. 
 	if (!ForwardTrace)
-		HitResultForward.Distance = FLT_MAX;
-	
+		HitResultForward.Distance = FLT_MAX;		
 	if (!RightTrace)
-		HitResultRight.Distance = FLT_MAX;
-	
+		HitResultRight.Distance = FLT_MAX;	
 	if (!LeftTrace)
 		HitResultLeft.Distance = FLT_MAX;
 	
@@ -220,8 +202,8 @@ void AMyCharacter::CheckFloorAngle()
 
 	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
 	{
+		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
 		GetCharacterMovement()->GravityScale = 0.f;
-		GetCharacterMovement()->Velocity = FVector(0.f, 0.f, -250.f);
 		GetCharacterMovement()->JumpZVelocity = 0;
 	}
 	else
@@ -324,7 +306,7 @@ void AMyCharacter::HandleJumpInput()
 
 void AMyCharacter::Landed(const FHitResult& Hit)
 {
-	Super::Landed(Hit);
+	Super::Super::Landed(Hit);
 
 	bHasReachedWallWhileSprinting = false;
 }
@@ -383,8 +365,6 @@ void AMyCharacter::CheckWallClimb()
 	// Check if all LineTraces find the climbing wall. 
 	if (ForwardTrace && RightTrace && LeftTrace)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Found wall to climb"));
-		
 		if (CurrentState == Eps_Aiming)
 		{
 			SavedState = Eps_Climbing;
@@ -405,10 +385,11 @@ void AMyCharacter::CheckWallClimb()
 	}
 
 	else if (CurrentState == Eps_Climbing)
-		StopClimbing();
+		CancelAction();
 }
 
-void AMyCharacter::StopClimbing()
+// Interrupt climbing
+void AMyCharacter::CancelAction()
 {
 	if (CurrentState != Eps_Climbing)
 		return;
@@ -416,16 +397,6 @@ void AMyCharacter::StopClimbing()
 	CantClimbTimer = 0.f;
 	CurrentState = Eps_Walking;
 	GetCharacterMovement()->MovementMode = MOVE_Walking;
-}
-
-void AMyCharacter::HandleMouseInputX(const float Value)
-{
-	MouseMovementX = Value * GetWorld()->DeltaTimeSeconds;
-}
-
-void AMyCharacter::HandleMouseInputY(const float Value)
-{
-	MouseMovementY = Value * GetWorld()->DeltaTimeSeconds;
 }
 
 void AMyCharacter::CameraMovementOutput()
@@ -436,7 +407,7 @@ void AMyCharacter::CameraMovementOutput()
 		return;
 	}
 	
-	CameraMovement = FVector2D(MouseMovementX, MouseMovementY);
+	CameraMovement = FVector2D(GetCameraMovementX(), GetCameraMovementY());
 
 	// Rotation
 	AddControllerYawInput(CameraMovement.X * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
@@ -495,7 +466,7 @@ void AMyCharacter::CheckIdleness()
 	}
 }
 
-void AMyCharacter::HandleAimInput()
+void AMyCharacter::HandleSecondaryActionInput()
 {
 	if (CurrentState == Eps_Idle
 		|| GetCharacterMovement()->IsMovingOnGround()
@@ -509,7 +480,7 @@ void AMyCharacter::HandleAimInput()
 	CurrentState = Eps_Aiming;
 }
 
-void AMyCharacter::HandleAimStop()
+void AMyCharacter::HandleSecondaryActionStop()
 {
 	if (CurrentState != Eps_Aiming)
 	return;
@@ -523,7 +494,8 @@ void AMyCharacter::SetCurrentOffset(float& Value, const float Speed, const float
 	Value = FMath::Clamp(Value, -Clamp, Clamp);
 }
 
-void AMyCharacter::LookForHook()
+// Look for target to hook to with hookshot
+void AMyCharacter::HandleActionInput()
 {
 	if (CurrentState != Eps_Aiming)
 		return;
@@ -540,21 +512,10 @@ void AMyCharacter::LookForHook()
 	auto HookTrace = GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, HookCollision, Parameters, FCollisionResponseParams());
 	if (HookTrace)
 	{
-		// FLatentActionInfo LatentInfo;
-		// LatentInfo.CallbackTarget = this;
-		
 		TargetLocation = HookshotTarget.Location - FollowCamera->GetForwardVector() * 50.f - FVector(0, 0, 100.f);
 		bIsUsingHookshot = true;
 		CurrentState = Eps_LeaveAiming;
 		
-		// EnHippieUnrealLibrary::MoveToLocation(
-		// 	this,
-		// 	TargetLocation,
-		// 	FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
-		// 	5,
-		// 	HookshotTarget.Distance/HookshotSpeed,
-		// 	GetWorld()->DeltaTimeSeconds);
-		//
 		UKismetSystemLibrary::MoveComponentTo(
 			RootComponent,
 			TargetLocation,
@@ -566,34 +527,13 @@ void AMyCharacter::LookForHook()
 			EMoveComponentAction::Move,
 			LatentActionInfo
 			);
-		
-		// MoveToLocation(LatentInfo, HookshotTarget.Distance/HookshotSpeed);
 	}
 }
 
-// void AMyCharacter::MoveToLocation(const FLatentActionInfo& CurrentLatentInfo, const float Duration) const
-// {
-// 	UKismetSystemLibrary::MoveComponentTo(
-// 		RootComponent,
-// 		TargetLocation,
-// 		FRotator(0, FollowCamera->GetForwardVector().Rotation().Yaw, 0),
-// 		false,
-// 		false,
-// 		Duration,
-// 		false,
-// 		EMoveComponentAction::Move,
-// 		CurrentLatentInfo
-// 		);
-// }
-
 void AMyCharacter::RunUpToWall()
 {
-	if (CurrentState != Eps_Sprinting)
+	if (CurrentState != Eps_Sprinting || bHasReachedWallWhileSprinting)
 		return;
-	if (bHasReachedWallWhileSprinting)
-		return;
-	// if (GetIsMidAir())
-	// 	return;
 	if (GetVelocity().Z < 0)
 	{
 		bIsNearingWall = false;
@@ -633,8 +573,6 @@ void AMyCharacter::RunUpToWall()
 	if (DistancedLookForWall && !DistancedCapsuleTrace)
 		bIsNearingWall = true;
 	
-	// UE_LOG(LogTemp, Warning, TEXT("Velocity: %f"), GetCharacterMovement()->Velocity.Length())
-
 	if (!bIsNearingWall)
 		return;
 	
@@ -645,7 +583,7 @@ void AMyCharacter::RunUpToWall()
 	if (LookForWall)
 	{
 		FHitResult CapsuleHitResult;
-		RunningUpWallEndLocation = GetActorLocation() + /*HitResult.ImpactNormal.UpVector */ GetActorUpVector() * 200.f;
+		RunningUpWallEndLocation = GetActorLocation() + GetActorUpVector() * 200.f;
 		
 		auto CapsuleTrace = UKismetSystemLibrary::CapsuleTraceSingle(
 			GetWorld(),
@@ -672,7 +610,7 @@ void AMyCharacter::RunUpToWall()
 			UKismetSystemLibrary::MoveComponentTo(
 				RootComponent,
 				RunningUpWallEndLocation,
-				GetActorRotation()/*HitResult.Normal.ForwardVector.Rotation()*/,
+				GetActorRotation(),
 				true,
 				false,
 				RunningUpWallSpeed,
@@ -687,23 +625,14 @@ void AMyCharacter::RunUpToWall()
 void AMyCharacter::RunningUpWall()
 {			
 	if (bHasReachedWallWhileSprinting)
-		GetCharacterMovement()->Velocity = FVector(0, 0, 0);
-
+		SetPlayerVelocity(FVector(0, 0, 0));
 	if (UKismetMathLibrary::Vector_Distance(GetActorLocation(), RunningUpWallEndLocation) < 10.f)
 		bHasReachedWallWhileSprinting = false;
-}
-
-template <typename T1, typename T2>
-void AMyCharacter::MyLerp(T1& A, T2 B, const float Alpha)
-{
-	A = FMath::Lerp(A, B, Alpha);
 }
 
 void AMyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	LatentActionInfo.CallbackTarget = this;
 }
 
 void AMyCharacter::Tick(float const DeltaTime)
@@ -725,26 +654,8 @@ void AMyCharacter::Tick(float const DeltaTime)
 	// Keep last 
 	PlayerStateSwitch();
 
-	UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
+	// UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
 	// UE_LOG(LogTemp, Warning, TEXT("Saved state: %d"), SavedState.GetValue())
 	// UE_LOG(LogTemp, Warning, TEXT("Player state: %d"), CurrentState.GetValue())
 	// UE_LOG(LogTemp, Warning, TEXT("FoundWall: %hhd"), bHasReachedWallWhileSprinting)
-}
-
-void AMyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	PlayerInputComponent->BindAxis("Forwards", this, &AMyCharacter::HandleForwardInput);
-	PlayerInputComponent->BindAxis("Sideways", this, &AMyCharacter::HandleSidewaysInput);
-	PlayerInputComponent->BindAxis("MouseX", this, &AMyCharacter::HandleMouseInputX);
-	PlayerInputComponent->BindAxis("MouseY", this, &AMyCharacter::HandleMouseInputY);
-	
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AMyCharacter::HandleJumpInput);
-	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &AMyCharacter::HandleSprintInput);
-	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &AMyCharacter::HandleSprintStop);
-	PlayerInputComponent->BindAction("Aim", IE_Pressed, this, &AMyCharacter::HandleAimInput);
-	PlayerInputComponent->BindAction("Aim", IE_Released, this, &AMyCharacter::HandleAimStop);
-	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMyCharacter::LookForHook);
-	PlayerInputComponent->BindAction("Drop", IE_Pressed, this, &AMyCharacter::StopClimbing);
 }

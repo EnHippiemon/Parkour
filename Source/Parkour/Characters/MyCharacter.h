@@ -1,12 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Character.h"
+#include "../Input/MyPlayerInput.h"
 #include "MyCharacter.generated.h"
 
-class USceneComponent;
-class USpringArmComponent;
-class UCameraComponent;
+// class USceneComponent;
+// class USpringArmComponent;
+// class UCameraComponent;
+// class AMyPlayerInput;
 
 // To do:
 // - Make a fancy function for the floor angle & movement energy
@@ -65,12 +66,11 @@ enum EPlayerState
 	Eps_Aiming,
 	Eps_LeaveAiming,
 	Eps_UseHookshot,
-	Eps_Climbing,
-	Eps_NoInput
+	Eps_Climbing
 };
 
 UCLASS()
-class PARKOUR_API AMyCharacter : public ACharacter
+class PARKOUR_API AMyCharacter : public AMyPlayerInput
 {
 	GENERATED_BODY()
 
@@ -81,8 +81,8 @@ public:
 	float GetMovementEnergy() { return MovementEnergy; }
 	
 private:
-	/* ---------- VARIABLES ----------- */
-
+#pragma region ---------- VARIABLES -----------
+#pragma region Camera
 	/* Camera speed */
 		UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
 		float StandardCameraSpeed = 5000.f;
@@ -125,7 +125,9 @@ private:
 		float SprintFOVSpeed = 0.3f;
 		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
 		float AimingFOV = 70.f;
-	
+#pragma endregion
+
+#pragma region Spring Arm
 	/* Spring arm length */
 		UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
 		float StandardSpringArmLength = 400.f;
@@ -139,19 +141,22 @@ private:
 		float SpringArmSwitchSpeed = 0.05f;
 		UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
 		float NormalCameraSwitchSpeed = 0.02f;
+#pragma endregion
+	
+#pragma region Hookshot 
+	// Higher is slower
+	UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+	float HookshotSpeed = 1000.f;
+	UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+	float HookLength = 1200.f;
+	UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+	TEnumAsByte<ECollisionChannel> HookCollision;
 
-	/* Hookshot */ 
-		// Higher is slower
-		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-		float HookshotSpeed = 1000.f;
-		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-		float HookLength = 1200.f;
-		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-		TEnumAsByte<ECollisionChannel> HookCollision;
-	
-		bool bIsUsingHookshot = false;
-		FVector TargetLocation;
-	
+	bool bIsUsingHookshot = false;
+	FVector TargetLocation;
+#pragma endregion
+
+#pragma region Character Movement
 	/* Jumping */ 
 		UPROPERTY(EditDefaultsOnly, Category=Jump)
 		float JumpImpulseUp = 50000.f;
@@ -191,95 +196,68 @@ private:
 		bool bIsNearingWall = false;
 		bool bHasReachedWallWhileSprinting = false;
 
-	/* Movement without input */
-		FLatentActionInfo LatentActionInfo;
-
 	/* Basic movement */
 		/* Idle */
 			UPROPERTY(EditDefaultsOnly, Category=Idle)
 			float TimeBeforeIdle = 15.f;
 
 			float TimeSinceMoved = 0.f;
-
-		/* Basic character movement */ 
-			FVector CharacterMovement;
-			float CharacterMovementForward = 0.f;
-			float CharacterMovementSideways = 0.f;
-		
-		/* Basic camera movement */
-			FVector2D CameraMovement;
-			float MouseMovementX = 0.f;
-			float MouseMovementY = 0.f;
+#pragma endregion
 	
-	/* Player states */ 
-		// Needs to be UPROPERTY if using Blueprints 
-		TEnumAsByte<EPlayerState> CurrentState;
-		// Save current state for later use 
-		TEnumAsByte<EPlayerState> SavedState;
-
-
-	/* ---------- FUNCTIONS ----------- */
+#pragma region Player States 
+	// Needs to be UPROPERTY if using Blueprints 
+	TEnumAsByte<EPlayerState> CurrentState;
+	// Save current state for later use 
+	TEnumAsByte<EPlayerState> SavedState;
+	// Previous state, to check if it has been changed
+	TEnumAsByte<EPlayerState> PreviousState;
+#pragma endregion 
+#pragma endregion
 	
+#pragma region ---------- FUNCTIONS -----------
 	/* Player states */
 		void PlayerStateSwitch();
 	
 	/* Character movement */
 		/* Basic character movement */
-			void HandleForwardInput(const float Value);
-			void HandleSidewaysInput(const float Value);
 			void MovementOutput();
+			void SetPlayerVelocity(const FVector& Value) const;
 
 		/* Speed changes */
 			void CheckFloorAngle();
 			void CheckExhaustion();
-			void HandleSprintInput();
-			void HandleSprintStop();
-			void SetPlayerVelocity(FVector Velocity);
+			virtual void HandleSprintInput() override;
+			virtual void HandleSprintStop() override;
 
 		/* Jumping */
-			void HandleJumpInput();
+			virtual void HandleJumpInput() override;
 			virtual void Landed(const FHitResult& Hit) override;
 			bool BCanJumpBackwards() const;
 			bool GetIsMidAir() const;
 		
 		/* Climbing */
 			void CheckWallClimb();
-			void StopClimbing();
+			virtual void CancelAction() override;
 
 		/* Running */ 
 			void RunUpToWall();
 			void RunningUpWall();
 
-		/* Movement without input */
-			void MoveToLocation(const FLatentActionInfo&, const float) const;
-
 	/* Camera movement */
 		/* Basic camera movement */
-			void HandleMouseInputX(const float Value);
-			void HandleMouseInputY(const float Value);
 			void CameraMovementOutput();
 
 		/* Camera changes */
 			void CheckIdleness();
-			void HandleAimInput();
-			void HandleAimStop();
+			virtual void HandleSecondaryActionInput() override;
+			virtual void HandleSecondaryActionStop() override;
 			void SetCurrentOffset(float& Value, const float Speed, const float Clamp) const;
 
-	/* Hookshot */ 
-		void LookForHook();
-
-	/* Static functions */ 
-		template <typename T1, typename T2>
-		static void MyLerp(T1& A, T2 B, const float Alpha);
+	/* Hookshot */
+		virtual void HandleActionInput() override;
 
 	/* Inherited functions */
 		virtual void BeginPlay() override;
 		virtual void Tick(float DeltaTime) override;
-		virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-	/* Attach components */
-		UPROPERTY(VisibleAnywhere, Category=Camera)
-		USpringArmComponent* SpringArm;
-		UPROPERTY(VisibleAnywhere, Category=Camera)
-		UCameraComponent* FollowCamera;
+#pragma endregion 
 };
