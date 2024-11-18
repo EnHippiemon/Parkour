@@ -12,13 +12,10 @@
 // To do:
 // - Make a fancy function for the floor angle & movement energy
 // - ? Separate camera when sprinting for a long time, or in special areas ?
-// - I have added Velocity length to sprint input. Double check so it doesn't bug. 
-
-// Camera Offset:
-// - If the character moves towards camera's right vector
-// - Followcamera offsetY -= walk direction related to camera clamped to max value. 
-// - When moving to right of screen, change camera offset to left.
-// - When standing to the left and moving camera to left, change camera offset to right.
+// - I have added Velocity length to sprint input. Double check so it doesn't bug.
+// - Add jump while climbing without moving with WASD to jump straight out from wall normal. 
+// - Make movement speed (s)lerp instead of being instant.
+// - 
 
 // Backward jump implementation:
 // NEW IMPLEMENTATION:
@@ -35,26 +32,20 @@
 // Put said bool in the Jump function
 // From the jump function, add velocity (and change direction of character)
 
-// Climbing rotation: 
-// NEW IMPLEMENTATION:
-// While climbing, create a linetrace pointing forward, with an offset based on moving direction
-// Get the normal off the wall using the linetrace
-// Rotate player towards wall normal.
-
-// Ledge climbing:
-// Linetrace above player
-// If no collision while climbing, movetotarget
-
 // Movement speed and energy depletion from floor angle:
 // Make the line trace length's max and min values into 0-1
 // Use that to scale both speed and energy depletion seamlessly
 
 // Known issues:
 // - Currently the player automatically stops sprinting after aiming. Otherwise you don't need
-// to hold down shift to run.
+//   to hold down shift to run.
+// 
 // - It might be difficult for the player to do wall jumping
-// atm. Should I implement so that you just need to jump and
-// not in any direction to jump backwards? 
+//	 atm. Should I implement so that you just need to jump and
+//   not in any direction to jump backwards?
+// 
+// - If jumping to side close to ground while climbing, it
+//   doesn't set movement to walking 
 
 
 // Needs to be UENUM if using Blueprints
@@ -82,136 +73,144 @@ public:
 	
 private:
 #pragma region ---------- VARIABLES -----------
-#pragma region Camera
-	/* Camera speed */
-		UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
-		float StandardCameraSpeed = 5000.f;
-		UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
-		float AimCameraSpeed = 50000.f;
+	/* Camera */
+		/* Camera speed */
+			UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
+			float StandardCameraSpeed = 5000.f;
+			UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
+			float AimCameraSpeed = 50000.f;
 
-	/* Camera position */
-		UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
-		FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
+		/* Camera position */
+			UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
+			FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
+			
+			// Decides how far to the sides the camera can move.
+			UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
+			FVector CameraClamp = FVector(0.f, 200.f, 100.f);
+
+			float CurrentCameraOffsetY = 150.f;
+			float CurrentCameraOffsetZ = 0.f;
 		
-		// Decides how far to the sides the camera can move.
-		UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
-		FVector CameraClamp = FVector(0.f, 200.f, 100.f);
+		/* Camera positioning speed */ 
+			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			float AimingCameraTransitionAlpha = 0.3f;
+			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			float StandardRotationRate = 500.f;
+			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			float AimRotationRate = 30000.f;
+		
+			// Decides how quickly the camera moves from side to side. 
+			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			float CameraYDirectionSpeed = 1000.f;
+		
+			float CurrentCameraSpeed;
 
-		float CurrentCameraOffsetY = 150.f;
-		float CurrentCameraOffsetZ = 0.f;
+		/* Camera field of view (FOV) */ 
+			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			float StillFOV = 60.f;
+			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			float WalkingFOV = 70.f;
+			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			float SprintingFOV = 125.f;
+			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			float SprintFOVSpeed = 0.3f;
+			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			float AimingFOV = 70.f;
+
+	/* Spring Arm */
+		/* Spring arm length */
+			UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+			float StandardSpringArmLength = 400.f;
+			UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+			float SprintingSpringArmLength = 600.f;
+			UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+			float StopAimingSpringArmLength = 400.f;
+
+		/* Spring arm extension speed */ 
+			UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
+			float SpringArmSwitchSpeed = 0.05f;
+			UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
+			float NormalCameraSwitchSpeed = 0.02f;
 	
-	/* Camera positioning speed */ 
-		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
-		float AimingCameraTransitionAlpha = 0.3f;
-		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
-		float StandardRotationRate = 500.f;
-		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
-		float AimRotationRate = 30000.f;
+	/* Hookshot */ 
+		// Higher is slower
+		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+		float HookshotSpeed = 1000.f;
+		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+		float HookLength = 1200.f;
+		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
+		TEnumAsByte<ECollisionChannel> HookCollision;
+
+		bool bIsUsingHookshot = false;
+		FVector TargetLocation;
+
+	/* Character Movement */
+		/* Jumping */ 
+			UPROPERTY(EditDefaultsOnly, Category=Jump)
+			float JumpImpulseUp = 50000.f;
+			UPROPERTY(EditDefaultsOnly, Category=Jump)
+			float JumpImpulseBack = 50000.f;
+
+		/* Energy */
+			UPROPERTY(EditDefaultsOnly, Category=Energy)
+			float AimEnergyDepletionSpeed = 7.5f;
+			UPROPERTY(EditDefaultsOnly, Category=Energy)
+			TEnumAsByte<ECollisionChannel> BlockAllCollision;
+			UPROPERTY(EditDefaultsOnly, Category=Energy)
+			float ExhaustionSpeed = 0.5f;
+		
+			float MovementEnergy = 1.00f;
+			float MovementSpeedPercent = 1.00f;
+			float FloorAngle = 1.00f;
+			bool bIsExhausted = false;
+
+		/* Climbing */
+			UPROPERTY(EditDefaultsOnly, Category=Climbing)
+			TEnumAsByte<ECollisionChannel> ClimbingCollision;
+			UPROPERTY(EditDefaultsOnly, Category=Climbing)
+			float AdjustPlayerRotationDistance = 15.f;
 	
-		// Decides how quickly the camera moves from side to side. 
-		UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
-		float CameraYDirectionSpeed = 1000.f;
+			float CantClimbTimer = 0.f;
+
+			/* Ledge climbing */
+				UPROPERTY (EditDefaultsOnly, Category=Climbing)
+				FVector LedgeClimbDetectionOffset = FVector(50.f, 0.f, 100.f);
+				UPROPERTY(EditDefaultsOnly, Category=Climbing)
+				float LedgeClimbDuration = 1.f;
+				UPROPERTY(EditDefaultsOnly, Category=Climbing)
+				TEnumAsByte<ECollisionChannel> LedgeChannel;
+
+				FVector LedgeClimbDestination; 
+				bool bIsClimbingLedge = false;
 	
-		float CurrentCameraSpeed;
+		/* Sprinting */
+			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+			TEnumAsByte<ETraceTypeQuery> ObstacleTraceType;
+			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+			float DistanceBeforeAbleToRunUpWall = 300.f;
+			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+			float RunningUpWallSpeed = 20.f;
+			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+			float DistanceToRunUpWall = 200.f;
+		
+			FTimerHandle TimerRunningUpWall;
+			FVector RunningUpWallEndLocation; 
+			bool bIsNearingWall = false;
+			bool bHasReachedWallWhileSprinting = false;
 
-	/* Camera field of view (FOV) */ 
-		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
-		float StillFOV = 60.f;
-		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
-		float WalkingFOV = 70.f;
-		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
-		float SprintingFOV = 125.f;
-		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
-		float SprintFOVSpeed = 0.3f;
-		UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
-		float AimingFOV = 70.f;
-#pragma endregion
-
-#pragma region Spring Arm
-	/* Spring arm length */
-		UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
-		float StandardSpringArmLength = 400.f;
-		UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
-		float SprintingSpringArmLength = 600.f;
-		UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
-		float StopAimingSpringArmLength = 400.f;
-
-	/* Spring arm extension speed */ 
-		UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
-		float SpringArmSwitchSpeed = 0.05f;
-		UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
-		float NormalCameraSwitchSpeed = 0.02f;
-#pragma endregion
-	
-#pragma region Hookshot 
-	// Higher is slower
-	UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-	float HookshotSpeed = 1000.f;
-	UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-	float HookLength = 1200.f;
-	UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-	TEnumAsByte<ECollisionChannel> HookCollision;
-
-	bool bIsUsingHookshot = false;
-	FVector TargetLocation;
-#pragma endregion
-
-#pragma region Character Movement
-	/* Jumping */ 
-		UPROPERTY(EditDefaultsOnly, Category=Jump)
-		float JumpImpulseUp = 50000.f;
-		UPROPERTY(EditDefaultsOnly, Category=Jump)
-		float JumpImpulseBack = 50000.f;
-
-	/* Energy */
-		UPROPERTY(EditDefaultsOnly, Category=Energy)
-		float AimEnergyDepletionSpeed = 7.5f;
-		UPROPERTY(EditDefaultsOnly, Category=Energy)
-		TEnumAsByte<ECollisionChannel> BlockAllCollision;
-		UPROPERTY(EditDefaultsOnly, Category=Energy)
-		float ExhaustionSpeed = 0.5f;
-	
-		float MovementEnergy = 1.00f;
-		float MovementSpeedPercent = 1.00f;
-		float FloorAngle = 1.00f;
-		bool bIsExhausted = false;
-
-	/* Climbing */
-		UPROPERTY(EditDefaultsOnly, Category=Climbing)
-		TEnumAsByte<ECollisionChannel> ClimbingCollision;
-		float CantClimbTimer = 0.f;
-
-	/* Sprinting */
-		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-		TEnumAsByte<ETraceTypeQuery> ObstacleTraceType;
-		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-		float DistanceBeforeAbleToRunUpWall = 300.f;
-		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-		float RunningUpWallSpeed = 20.f;
-		UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-		float DistanceToRunUpWall = 200.f;
-	
-		FTimerHandle TimerRunningUpWall;
-		FVector RunningUpWallEndLocation; 
-		bool bIsNearingWall = false;
-		bool bHasReachedWallWhileSprinting = false;
-
-	/* Basic movement */
 		/* Idle */
 			UPROPERTY(EditDefaultsOnly, Category=Idle)
 			float TimeBeforeIdle = 15.f;
 
 			float TimeSinceMoved = 0.f;
-#pragma endregion
 	
-#pragma region Player States 
-	// Needs to be UPROPERTY if using Blueprints 
-	TEnumAsByte<EPlayerState> CurrentState;
-	// Save current state for later use 
-	TEnumAsByte<EPlayerState> SavedState;
-	// Previous state, to check if it has been changed
-	TEnumAsByte<EPlayerState> PreviousState;
-#pragma endregion 
+	/* Player States */ 
+		// Needs to be UPROPERTY if using Blueprints 
+		TEnumAsByte<EPlayerState> CurrentState;
+		// Save current state for later use 
+		TEnumAsByte<EPlayerState> SavedState;
+		// Previous state, to check if it has been changed
+		TEnumAsByte<EPlayerState> PreviousState;
 #pragma endregion
 	
 #pragma region ---------- FUNCTIONS -----------
@@ -237,7 +236,11 @@ private:
 		
 		/* Climbing */
 			void CheckWallClimb();
+			void SetClimbRotation();
 			virtual void CancelAction() override;
+
+			/* Ledge climbing */
+				void LookForLedge();
 
 		/* Running */ 
 			void RunUpToWall();

@@ -145,10 +145,10 @@ void AMyCharacter::MovementOutput()
 		return;
 	}
 
-	if (CurrentState != Eps_Climbing)
-		CharacterMovement = FVector(GetMovementForward(), GetMovementSideways(), 0.f);
-	else
+	if (CurrentState == Eps_Climbing)
 		CharacterMovement = FVector(0.f, GetMovementSideways(), GetMovementForward());
+	else
+		CharacterMovement = FVector(GetMovementForward(), GetMovementSideways(), 0.f);
 	
 	CharacterMovement.Normalize();
 
@@ -344,13 +344,17 @@ void AMyCharacter::CheckWallClimb()
 	if (CantClimbTimer < 1.f)
 	{
 		CantClimbTimer += GetWorld()->DeltaTimeSeconds;
+		SetClimbRotation();
 		return;
 	}
 
-	FVector StartWallAngle = GetActorLocation();
-	FVector EndForwardAngle = GetActorLocation() + GetActorForwardVector() * 80.f;
-	FVector EndRightAngle = GetActorLocation() + GetActorForwardVector() * 80.f + GetActorRightVector() * 25.f;
-	FVector EndLeftAngle = GetActorLocation() + GetActorForwardVector() * 80.f - GetActorRightVector() * 25.f;
+	const auto World = GetWorld();
+	const auto ActorLocation = GetActorLocation();
+	
+	const FVector StartWallAngle = ActorLocation;
+	const FVector EndForwardAngle = ActorLocation + GetActorForwardVector() * 80.f;
+	const FVector EndRightAngle = ActorLocation + GetActorForwardVector() * 80.f + GetActorRightVector() * 25.f;
+	const FVector EndLeftAngle = ActorLocation + GetActorForwardVector() * 80.f - GetActorRightVector() * 25.f;
 
 	FHitResult HitResultForward;
 	FHitResult HitResultRight;
@@ -358,9 +362,9 @@ void AMyCharacter::CheckWallClimb()
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
 
-	auto ForwardTrace = GetWorld()->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
-	auto RightTrace = GetWorld()->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
-	auto LeftTrace = GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
+	const auto ForwardTrace = World->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
+	const auto RightTrace = World->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
+	const auto LeftTrace = World->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
 
 	// Check if all LineTraces find the climbing wall. 
 	if (ForwardTrace && RightTrace && LeftTrace)
@@ -370,22 +374,37 @@ void AMyCharacter::CheckWallClimb()
 			SavedState = Eps_Climbing;
 			CurrentState = Eps_LeaveAiming;
 		}
-
 		else
 		{
-			GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
 			CurrentState = Eps_Climbing;
-			FRotator WallAngle = HitResultForward.ImpactNormal.Rotation();
-			SetActorRotation(FMath::Lerp(
-				GetActorRotation(),
-				FRotator(0.f, 180.f, 0.f)
-				+ FRotator(-WallAngle.Pitch, WallAngle.Yaw, 0.f), /*WallAngle,*/
-				0.05f));
+			GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
+			SetClimbRotation();
 		}
 	}
-
 	else if (CurrentState == Eps_Climbing)
 		CancelAction();
+}
+
+void AMyCharacter::SetClimbRotation()
+{
+	const FVector StartPlayerRotationVector = GetActorLocation() - GetActorForwardVector() * GetCapsuleComponent()->GetScaledCapsuleRadius() / 2;
+	const FVector EndPlayerRotationVector = GetActorLocation() + GetActorUpVector() * GetMovementForward() * AdjustPlayerRotationDistance + GetActorRightVector() * GetMovementSideways() * AdjustPlayerRotationDistance + GetActorForwardVector() * 80.f;
+	FHitResult HitResultPlayerRotation;
+	FCollisionQueryParams Parameters;
+	Parameters.AddIgnoredActor(this);
+	
+	const auto PlayerRotationTrace = GetWorld()->LineTraceSingleByChannel(HitResultPlayerRotation, StartPlayerRotationVector, EndPlayerRotationVector, ClimbingCollision, Parameters, FCollisionResponseParams());
+
+	if (PlayerRotationTrace)
+	{
+		DrawDebugLine(GetWorld(), StartPlayerRotationVector, EndPlayerRotationVector, FColor::Purple, false, 0.5f);
+		FRotator WallAngle = HitResultPlayerRotation.ImpactNormal.Rotation();
+		SetActorRotation(FMath::Lerp(
+			GetActorRotation(),
+			FRotator(0.f, 180.f, 0.f)
+			+ FRotator(-WallAngle.Pitch, WallAngle.Yaw, 0.f),
+			0.05f));
+	}
 }
 
 // Interrupt climbing
@@ -397,6 +416,50 @@ void AMyCharacter::CancelAction()
 	CantClimbTimer = 0.f;
 	CurrentState = Eps_Walking;
 	GetCharacterMovement()->MovementMode = MOVE_Walking;
+}
+
+void AMyCharacter::LookForLedge()
+{
+	if (bIsClimbingLedge)
+	{
+		SetPlayerVelocity(FVector(0, 0, 0));
+		if (FMath::IsNearlyZero((GetActorLocation() - LedgeClimbDestination).Length()))
+			bIsClimbingLedge = false;
+		return;
+	}
+	if (!GetIsMidAir())
+		return; 
+
+	auto World = GetWorld();
+	const FVector LowTraceStart = GetActorLocation();
+	const FVector LowTraceEnd = LowTraceStart + GetActorForwardVector() * LedgeClimbDetectionOffset.X;
+	const FVector HighTraceStart = GetActorLocation() + GetActorUpVector() * LedgeClimbDetectionOffset.Z;
+	const FVector HighTraceEnd = HighTraceStart + GetActorForwardVector() * LedgeClimbDetectionOffset.X;
+	
+	FHitResult LowHitResult;
+	FHitResult HighHitResult;
+	FCollisionQueryParams Parameters;
+	Parameters.AddIgnoredActor(this);
+	const auto LowTrace = World->LineTraceSingleByChannel(LowHitResult, LowTraceStart, LowTraceEnd, LedgeChannel, Parameters, FCollisionResponseParams());
+	const auto HighTrace = World->LineTraceSingleByChannel(HighHitResult, HighTraceStart, HighTraceEnd, BlockAllCollision, Parameters, FCollisionResponseParams());
+
+	if (LowTrace && !HighTrace)
+	{
+		LedgeClimbDestination = HighTraceEnd + FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		bIsClimbingLedge = true;
+		
+		UKismetSystemLibrary::MoveComponentTo(
+			RootComponent,
+			LedgeClimbDestination,
+			GetActorRotation()/*LowHitResult.ImpactNormal.Rotation().GetInverse()*/,
+			true,
+			true,
+			LedgeClimbDuration,
+			false,
+			EMoveComponentAction::Move,
+			LatentActionInfo
+			);
+	}
 }
 
 void AMyCharacter::CameraMovementOutput()
@@ -431,23 +494,24 @@ void AMyCharacter::CameraMovementOutput()
 			SetCurrentOffset(CurrentCameraOffsetZ, CameraYDirectionSpeed, CameraClamp.Z);
 	}
 
-	float CameraSpeed;
-	CurrentState == Eps_Climbing ? CameraSpeed = CameraYDirectionSpeed * 2
-	: CameraSpeed = CameraYDirectionSpeed / (CharacterMovement.Length() + 1);
-	
-	if (CameraMovement.X < -0.005f)
-			SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
-
-	else if (CameraMovement.X > 0.005f)
-			SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
-
+	float CameraSpeed;	
 	if (CurrentState == Eps_Climbing)
 	{
+		CameraSpeed = CameraYDirectionSpeed * 2;
 		if (CameraMovement.Y < -0.005f)
 				SetCurrentOffset(CurrentCameraOffsetZ, -CameraSpeed, CameraClamp.Z);
 
 		else if (CameraMovement.Y > 0.005f)
 				SetCurrentOffset(CurrentCameraOffsetZ, CameraSpeed, CameraClamp.Z);
+	}
+	else
+	{
+		CameraSpeed = CameraYDirectionSpeed / (CharacterMovement.Length() + 1);
+		if (CameraMovement.X < -0.005f)
+				SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
+
+		else if (CameraMovement.X > 0.005f)
+				SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
 	}
 }
 
@@ -562,7 +626,7 @@ void AMyCharacter::RunUpToWall()
 		ObstacleTraceType,
 		false,
 		{this},
-		EDrawDebugTrace::ForDuration,
+		EDrawDebugTrace::None,
 		DistanceCapsuleHitResult,
 		true,
 		FLinearColor::Red,
@@ -646,6 +710,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	/* Climbing */
 	CheckExhaustion();
 	CheckWallClimb();
+	LookForLedge();
 	
 	/* Running */
 	RunUpToWall();
