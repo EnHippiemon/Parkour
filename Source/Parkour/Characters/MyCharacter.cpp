@@ -175,10 +175,10 @@ void AMyCharacter::SetPlayerVelocity(const FVector& Value) const
 
 void AMyCharacter::CheckFloorAngle()
 {
-	FVector StartFloorAngle = GetActorLocation();
-	FVector EndForwardAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f;
-	FVector EndRightAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f + GetActorRightVector() * 100.f;
-	FVector EndLeftAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f - GetActorRightVector() * 100.f;
+	const FVector StartFloorAngle = GetActorLocation();
+	const FVector EndForwardAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f;
+	const FVector EndRightAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f + GetActorRightVector() * 100.f;
+	const FVector EndLeftAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f - GetActorRightVector() * 100.f;
 
 	FHitResult HitResultForward;
 	FHitResult HitResultRight;
@@ -186,9 +186,9 @@ void AMyCharacter::CheckFloorAngle()
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
 
-	auto ForwardTrace = GetWorld()->LineTraceSingleByChannel(HitResultForward, StartFloorAngle, EndForwardAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
-	auto RightTrace = GetWorld()->LineTraceSingleByChannel(HitResultRight, StartFloorAngle, EndRightAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
-	auto LeftTrace = GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartFloorAngle, EndLeftAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
+	const auto ForwardTrace = GetWorld()->LineTraceSingleByChannel(HitResultForward, StartFloorAngle, EndForwardAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
+	const auto RightTrace = GetWorld()->LineTraceSingleByChannel(HitResultRight, StartFloorAngle, EndRightAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
+	const auto LeftTrace = GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartFloorAngle, EndLeftAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
 
 	// If the line trace is null distance = 0. Then setting distance to max so the other ones are shorter. 
 	if (!ForwardTrace)
@@ -197,7 +197,8 @@ void AMyCharacter::CheckFloorAngle()
 		HitResultRight.Distance = FLT_MAX;	
 	if (!LeftTrace)
 		HitResultLeft.Distance = FLT_MAX;
-	
+
+	// Get the shortest trace
 	FloorAngle = FMath::Min3(HitResultForward.Distance, HitResultLeft.Distance, HitResultRight.Distance) / 100.f;
 
 	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
@@ -282,12 +283,25 @@ void AMyCharacter::HandleJumpInput()
 		bHasReachedWallWhileSprinting = false;
 		return;
 	}
-	
+
+	// Jump while climbing 
 	if (CurrentState == Eps_Climbing && MovementEnergy > 0.f && CantClimbTimer >= 1.f)
 	{
 		CantClimbTimer = 0.5f;
 		MovementEnergy -= 0.3f;
 		GetCharacterMovement()->BrakingDecelerationFlying = 1000.f;
+
+		// Jump backward, straight out from wall 
+		if (GetCharacterMovement()->Velocity.Length() == 0)
+		{
+			bIsJumpingOutFromWall = true;
+			// GetCharacterMovement()->Velocity = FVector(0.f, 0.f, VelocityClimbJumpOutUp) - GetActorForwardVector() * VelocityClimbJumpOutBack;
+			GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, ClimbJumpOutImpulseUp) - GetActorForwardVector() * ClimbJumpOutImpulseBack);
+			SetActorRotation(FRotator(0, GetActorRotation().Yaw + 180, 0));
+			return;
+		}
+
+		// Jump in direction of movement input 
 		GetCharacterMovement()->AddImpulse(CharacterMovement * JumpImpulseUp);
 		return;
 	}
@@ -339,22 +353,24 @@ bool AMyCharacter::GetIsMidAir() const
 	return GetCharacterMovement()->Velocity.Z == 0 ? 0 : 1;
 }
 
-void AMyCharacter::CheckWallClimb()
+void AMyCharacter::FindClimbableWall()
 {
 	if (CantClimbTimer < 1.f)
 	{
 		CantClimbTimer += GetWorld()->DeltaTimeSeconds;
-		SetClimbRotation();
+		FindClimbRotation();
 		return;
 	}
 
 	const auto World = GetWorld();
 	const auto ActorLocation = GetActorLocation();
+	const auto ForwardVector = GetActorForwardVector();
+	const auto RightVector = GetActorRightVector();
 	
 	const FVector StartWallAngle = ActorLocation;
-	const FVector EndForwardAngle = ActorLocation + GetActorForwardVector() * 80.f;
-	const FVector EndRightAngle = ActorLocation + GetActorForwardVector() * 80.f + GetActorRightVector() * 25.f;
-	const FVector EndLeftAngle = ActorLocation + GetActorForwardVector() * 80.f - GetActorRightVector() * 25.f;
+	const FVector EndForwardAngle = ActorLocation + ForwardVector * 80.f;
+	const FVector EndRightAngle = ActorLocation + ForwardVector * 80.f + RightVector * ClimbingSensitivityWidth;
+	const FVector EndLeftAngle = ActorLocation + ForwardVector * 80.f - RightVector * ClimbingSensitivityWidth;
 
 	FHitResult HitResultForward;
 	FHitResult HitResultRight;
@@ -366,8 +382,10 @@ void AMyCharacter::CheckWallClimb()
 	const auto RightTrace = World->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
 	const auto LeftTrace = World->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
 
-	// Check if all LineTraces find the climbing wall. 
-	if (ForwardTrace && RightTrace && LeftTrace)
+	// Check if LineTraces find the climbing wall. 
+	if (ForwardTrace && RightTrace ||
+		ForwardTrace && LeftTrace ||
+		RightTrace && LeftTrace)
 	{
 		if (CurrentState == Eps_Aiming)
 		{
@@ -378,33 +396,70 @@ void AMyCharacter::CheckWallClimb()
 		{
 			CurrentState = Eps_Climbing;
 			GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
-			SetClimbRotation();
+			FindClimbRotation();
 		}
 	}
 	else if (CurrentState == Eps_Climbing)
 		CancelAction();
 }
 
-void AMyCharacter::SetClimbRotation()
+void AMyCharacter::FindClimbRotation()
 {
-	const FVector StartPlayerRotationVector = GetActorLocation() - GetActorForwardVector() * GetCapsuleComponent()->GetScaledCapsuleRadius() / 2;
-	const FVector EndPlayerRotationVector = GetActorLocation() + GetActorUpVector() * GetMovementForward() * AdjustPlayerRotationDistance + GetActorRightVector() * GetMovementSideways() * AdjustPlayerRotationDistance + GetActorForwardVector() * 80.f;
 	FHitResult HitResultPlayerRotation;
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
-	
-	const auto PlayerRotationTrace = GetWorld()->LineTraceSingleByChannel(HitResultPlayerRotation, StartPlayerRotationVector, EndPlayerRotationVector, ClimbingCollision, Parameters, FCollisionResponseParams());
 
-	if (PlayerRotationTrace)
+	const auto World = GetWorld();
+	const auto ActorLocation = GetActorLocation();
+	const auto ForwardVector = GetActorForwardVector();
+	const auto RightVector = GetActorRightVector();
+	const auto UpVector = GetActorUpVector();
+	const auto CapsuleRadius = GetCapsuleComponent()->GetScaledCapsuleRadius() * 0.5f;
+	const auto MovementSideways = GetMovementSideways();
+	const auto MovementForward = GetMovementForward();
+	
+	const FVector StartBackWallDetection = ActorLocation + ForwardVector * CapsuleRadius;
+	const FVector EndBackWallDetection = ActorLocation + UpVector * MovementForward * 4000 + RightVector * MovementSideways * 4000 - ForwardVector * 30.f;
+	auto WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartBackWallDetection, EndBackWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
+	
+	if (!WallRotationTrace)
 	{
-		DrawDebugLine(GetWorld(), StartPlayerRotationVector, EndPlayerRotationVector, FColor::Purple, false, 0.5f);
-		FRotator WallAngle = HitResultPlayerRotation.ImpactNormal.Rotation();
-		SetActorRotation(FMath::Lerp(
-			GetActorRotation(),
-			FRotator(0.f, 180.f, 0.f)
-			+ FRotator(-WallAngle.Pitch, WallAngle.Yaw, 0.f),
-			0.05f));
+		const FVector StartSideWallDetection = ActorLocation;
+		const FVector EndSideWallDetection = ActorLocation + MovementSideways * RightVector * 5000.f;
+		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartSideWallDetection, EndSideWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
+		if (WallRotationTrace)
+			goto setrot;
+	
+		const FVector StartFrontWallDetection = ActorLocation - ForwardVector * CapsuleRadius;
+		const FVector EndFrontWallDetection = ActorLocation + UpVector * MovementForward * AdjustPlayerRotationDistance + RightVector * MovementSideways * AdjustPlayerRotationDistance + ForwardVector * 80.f;
+		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartFrontWallDetection, EndFrontWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
+		if (WallRotationTrace)
+			goto setrot;
+	
+		const FVector EndEyesightWallDetection = ActorLocation + ForwardVector * 100.f;
+		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, ActorLocation, EndEyesightWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
 	}
+	
+	if (WallRotationTrace)
+	{
+		setrot:
+
+		if (bIsJumpingOutFromWall && CurrentClimbingWall == HitResultPlayerRotation.GetActor())
+			return;
+
+		bIsJumpingOutFromWall = false;
+		CurrentClimbingWall = HitResultPlayerRotation.GetActor();
+		SetPlayerRotation(HitResultPlayerRotation.ImpactNormal.Rotation());
+	}
+}
+
+void AMyCharacter::SetPlayerRotation(const FRotator& TargetRotation)
+{
+	SetActorRotation(FMath::Lerp(
+		GetActorRotation(),
+		FRotator(0.f, 180.f, 0.f)
+		+ FRotator(-TargetRotation.Pitch, TargetRotation.Yaw, 0.f),
+		0.05f));
 }
 
 // Interrupt climbing
@@ -573,7 +628,7 @@ void AMyCharacter::HandleActionInput()
 
 	DrawDebugLine(GetWorld(), StartHookSearch, EndHookSearch, FColor::Purple, false, 0.1f, 0.f, 3.f);
 
-	auto HookTrace = GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, HookCollision, Parameters, FCollisionResponseParams());
+	const auto HookTrace = GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, HookCollision, Parameters, FCollisionResponseParams());
 	if (HookTrace)
 	{
 		TargetLocation = HookshotTarget.Location - FollowCamera->GetForwardVector() * 50.f - FVector(0, 0, 100.f);
@@ -709,7 +764,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	
 	/* Climbing */
 	CheckExhaustion();
-	CheckWallClimb();
+	FindClimbableWall();
 	LookForLedge();
 	
 	/* Running */

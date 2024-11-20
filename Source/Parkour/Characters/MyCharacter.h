@@ -75,61 +75,61 @@ private:
 #pragma region ---------- VARIABLES -----------
 	/* Camera */
 		/* Camera speed */
-			UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraSpeed")
 			float StandardCameraSpeed = 5000.f;
-			UPROPERTY(EditDefaultsOnly, Category=CameraSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraSpeed")
 			float AimCameraSpeed = 50000.f;
 
 		/* Camera position */
-			UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPosition")
 			FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
 			
 			// Decides how far to the sides the camera can move.
-			UPROPERTY(EditDefaultsOnly, Category=CameraPosition)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPosition")
 			FVector CameraClamp = FVector(0.f, 200.f, 100.f);
 
 			float CurrentCameraOffsetY = 150.f;
 			float CurrentCameraOffsetZ = 0.f;
 		
 		/* Camera positioning speed */ 
-			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
 			float AimingCameraTransitionAlpha = 0.3f;
-			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
 			float StandardRotationRate = 500.f;
-			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
 			float AimRotationRate = 30000.f;
 		
 			// Decides how quickly the camera moves from side to side. 
-			UPROPERTY(EditDefaultsOnly, Category=CameraPositionSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
 			float CameraYDirectionSpeed = 1000.f;
 		
 			float CurrentCameraSpeed;
 
 		/* Camera field of view (FOV) */ 
-			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
 			float StillFOV = 60.f;
-			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
 			float WalkingFOV = 70.f;
-			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
 			float SprintingFOV = 125.f;
-			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
 			float SprintFOVSpeed = 0.3f;
-			UPROPERTY(EditDefaultsOnly, Category=CameraFieldOfView)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
 			float AimingFOV = 70.f;
 
 	/* Spring Arm */
 		/* Spring arm length */
-			UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
 			float StandardSpringArmLength = 400.f;
-			UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
 			float SprintingSpringArmLength = 600.f;
-			UPROPERTY(EditDefaultsOnly, Category=SpringArmLength)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
 			float StopAimingSpringArmLength = 400.f;
 
 		/* Spring arm extension speed */ 
-			UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
 			float SpringArmSwitchSpeed = 0.05f;
-			UPROPERTY(EditDefaultsOnly, Category=SpringArmExtensionSpeed)
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
 			float NormalCameraSwitchSpeed = 0.02f;
 	
 	/* Hookshot */ 
@@ -169,15 +169,30 @@ private:
 			TEnumAsByte<ECollisionChannel> ClimbingCollision;
 			UPROPERTY(EditDefaultsOnly, Category=Climbing)
 			float AdjustPlayerRotationDistance = 15.f;
+			UPROPERTY(EditDefaultsOnly, Category=Climbing)
+			float ClimbingSensitivityWidth = 40.f;
+
+			// Impulse or velocity? 
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float ClimbJumpOutImpulseUp = 55000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float ClimbJumpOutImpulseBack = 60000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float VelocityClimbJumpOutUp = 550.f;
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float VelocityClimbJumpOutBack = 600.f;
 	
 			float CantClimbTimer = 0.f;
+			bool bIsJumpingOutFromWall;
+			UPROPERTY()
+			AActor* CurrentClimbingWall;
 
 			/* Ledge climbing */
-				UPROPERTY (EditDefaultsOnly, Category=Climbing)
+				UPROPERTY (EditDefaultsOnly, Category="Climbing|Ledge")
 				FVector LedgeClimbDetectionOffset = FVector(50.f, 0.f, 100.f);
-				UPROPERTY(EditDefaultsOnly, Category=Climbing)
+				UPROPERTY(EditDefaultsOnly, Category="Climbing|Ledge")
 				float LedgeClimbDuration = 1.f;
-				UPROPERTY(EditDefaultsOnly, Category=Climbing)
+				UPROPERTY(EditDefaultsOnly, Category="Climbing|Ledge")
 				TEnumAsByte<ECollisionChannel> LedgeChannel;
 
 				FVector LedgeClimbDestination; 
@@ -235,8 +250,9 @@ private:
 			bool GetIsMidAir() const;
 		
 		/* Climbing */
-			void CheckWallClimb();
-			void SetClimbRotation();
+			void FindClimbableWall();
+			void FindClimbRotation();
+			void SetPlayerRotation(const FRotator& TargetRotation);
 			virtual void CancelAction() override;
 
 			/* Ledge climbing */
