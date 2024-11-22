@@ -4,12 +4,29 @@
 #include "../Input/MyPlayerInput.h"
 #include "MyCharacter.generated.h"
 
-// class USceneComponent;
-// class USpringArmComponent;
-// class UCameraComponent;
-// class AMyPlayerInput;
-
 // To do:
+// After mentoring with Martin:
+// - Situational cameras. Such as:
+//   - When climbing and there is a wall behind that you could jump to,
+//	   zoom out so you can see them both clearer
+//	 - When running without camera input, start lerping to character's
+//	   forward vector
+// - Find a way to relay my project in a neat way for my portfolio
+// - Somehow convey what kind of movement (what character animation)
+//	 would be appropriate.
+//	 - Running
+//	 - Walking
+//	 - Idle
+//	 - Climbing
+//	 - Ledge climbing
+//	 - Wall jumping
+//	 - Running up wall
+//	 - Side jump on wall
+// - Jumping on pillars
+// - Remove magic numbers to a reasonable extent 
+// - Cinematic camera?
+
+
 // - Make a fancy function for the floor angle & movement energy
 // - ? Separate camera when sprinting for a long time, or in special areas ?
 // - I have added Velocity length to sprint input. Double check so it doesn't bug.
@@ -47,6 +64,7 @@
 // - If jumping to side close to ground while climbing, it
 //   doesn't set movement to walking 
 
+// DECLARE_MULTICAST_DELEGATE_OneParam()
 
 // Needs to be UENUM if using Blueprints
 enum EPlayerState
@@ -145,6 +163,17 @@ private:
 		FVector TargetLocation;
 
 	/* Character Movement */
+		/* Speed */
+			UPROPERTY(EditDefaultsOnly, Category=MovementSpeed)
+			float ReachTargetUpSpeed = 1.f;
+			UPROPERTY(EditDefaultsOnly, Category=MovementSpeed)
+			float ReachTargetDownSpeed = 3.f;
+			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+			float MaxWalkSpeed = 600.f;
+				
+			float TargetMovementSpeed = 600.f;
+			bool bShouldStopMovementOverTime = false;
+	
 		/* Jumping */ 
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
 			float JumpImpulseUp = 50000.f;
@@ -207,6 +236,8 @@ private:
 			float RunningUpWallSpeed = 20.f;
 			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
 			float DistanceToRunUpWall = 200.f;
+			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
+			float MaxSprintSpeed = 1000.f;
 		
 			FTimerHandle TimerRunningUpWall;
 			FVector RunningUpWallEndLocation; 
@@ -242,6 +273,9 @@ private:
 			void CheckExhaustion();
 			virtual void HandleSprintInput() override;
 			virtual void HandleSprintStop() override;
+			void SetMovementSpeed(const float TargetSpeed) const;
+			void StopMovementOverTime();
+			void CheckShouldStopMovementOverTime();
 
 		/* Jumping */
 			virtual void HandleJumpInput() override;
@@ -274,6 +308,9 @@ private:
 
 	/* Hookshot */
 		virtual void HandleActionInput() override;
+
+	/* Static functions */
+		static float FindSmallestFloat(TArray<float>);
 
 	/* Inherited functions */
 		virtual void BeginPlay() override;

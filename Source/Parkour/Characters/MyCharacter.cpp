@@ -65,7 +65,7 @@ void AMyCharacter::PlayerStateSwitch()
 	case Eps_Walking:
 		CheckFloorAngle();
 		CheckIdleness();
-		GetCharacterMovement()->MaxWalkSpeed = 600.f * MovementSpeedPercent * MovementEnergy;
+		TargetMovementSpeed = MaxWalkSpeed * MovementSpeedPercent * MovementEnergy;
 		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
 		if (GetCharacterMovement()->Velocity.Length() != 0)
 			FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed/4);
@@ -74,7 +74,7 @@ void AMyCharacter::PlayerStateSwitch()
 		break;
 	case Eps_Sprinting:
 		CheckFloorAngle();
-		GetCharacterMovement()->MaxWalkSpeed = 1000.f * MovementSpeedPercent * MovementEnergy;
+		TargetMovementSpeed = MaxSprintSpeed * MovementSpeedPercent * MovementEnergy;
 		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, SprintingSpringArmLength, SpringArmSwitchSpeed);
 		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, SprintingFOV, SprintFOVSpeed);
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
@@ -151,7 +151,7 @@ void AMyCharacter::MovementOutput()
 		CharacterMovement = FVector(GetMovementForward(), GetMovementSideways(), 0.f);
 	
 	CharacterMovement.Normalize();
-
+	
 	if (CurrentState != Eps_Climbing)
 	{
 		// Walk toward camera's forward vector 
@@ -164,8 +164,21 @@ void AMyCharacter::MovementOutput()
 		// Climb in relation to character's rotation 
 		CharacterMovement = GetActorForwardVector().Rotation().RotateVector(CharacterMovement);
 	}
-	
-	AddMovementInput(CharacterMovement);
+
+	if (CharacterMovement.Length() == 0)
+	{
+		if (GetCharacterMovement()->MaxWalkSpeed < 20.f || GetIsMidAir())
+			bShouldStopMovementOverTime = false;
+		
+		SetMovementSpeed(0);
+		StopMovementOverTime();
+	}
+	else
+	{
+		SetMovementSpeed(TargetMovementSpeed);
+		AddMovementInput(CharacterMovement);
+	}
+	// UE_LOG(LogTemp, Log, TEXT("Movement: %f"), GetCharacterMovement()->MaxWalkSpeed);
 }
 
 void AMyCharacter::SetPlayerVelocity(const FVector& Value) const
@@ -175,32 +188,47 @@ void AMyCharacter::SetPlayerVelocity(const FVector& Value) const
 
 void AMyCharacter::CheckFloorAngle()
 {
+	const auto World = GetWorld();
+	constexpr int TraceLengthForward = 150;
+	constexpr int TraceLengthDown = 300;
 	const FVector StartFloorAngle = GetActorLocation();
-	const FVector EndForwardAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f;
-	const FVector EndRightAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f + GetActorRightVector() * 100.f;
-	const FVector EndLeftAngle = GetActorLocation() + GetActorForwardVector() * 150.f - GetActorUpVector() * 300.f - GetActorRightVector() * 100.f;
+	const FVector EndForwardAngle = StartFloorAngle + GetActorForwardVector() * TraceLengthForward - GetActorUpVector() * TraceLengthDown;
 
-	FHitResult HitResultForward;
-	FHitResult HitResultRight;
-	FHitResult HitResultLeft;
+	constexpr int NumberOfTraces = 10;
+	constexpr int WidestPossibleTrace = 100;
+	TArray<FVector> TraceEnds;
+	TraceEnds.AddUninitialized(NumberOfTraces);
+	TArray<FHitResult> TraceHitResults;
+	TraceHitResults.AddUninitialized(NumberOfTraces);
+	TArray<bool> Traces;
+	Traces.AddUninitialized(NumberOfTraces);
+	TArray<float> TraceDistances;
+	TraceDistances.AddUninitialized(NumberOfTraces);
+
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
+	
+	int CurrentTrace = 0;
+	for (int i = -WidestPossibleTrace; i < WidestPossibleTrace; ++i)
+	{
+		// Multiply NumberOfTraces with 2 to compensate for counting both sides at the same time 
+		if (i % (NumberOfTraces * 2) == 1 || i % (NumberOfTraces * 2) == -1)
+		{
+			TraceEnds[CurrentTrace] = FVector(EndForwardAngle + GetActorRightVector() * i);
+			Traces[CurrentTrace] = World->LineTraceSingleByChannel(TraceHitResults[CurrentTrace], StartFloorAngle, TraceEnds[CurrentTrace], BlockAllCollision, Parameters, FCollisionResponseParams());
 
-	const auto ForwardTrace = GetWorld()->LineTraceSingleByChannel(HitResultForward, StartFloorAngle, EndForwardAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
-	const auto RightTrace = GetWorld()->LineTraceSingleByChannel(HitResultRight, StartFloorAngle, EndRightAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
-	const auto LeftTrace = GetWorld()->LineTraceSingleByChannel(HitResultLeft, StartFloorAngle, EndLeftAngle, BlockAllCollision, Parameters, FCollisionResponseParams());
-
-	// If the line trace is null distance = 0. Then setting distance to max so the other ones are shorter. 
-	if (!ForwardTrace)
-		HitResultForward.Distance = FLT_MAX;		
-	if (!RightTrace)
-		HitResultRight.Distance = FLT_MAX;	
-	if (!LeftTrace)
-		HitResultLeft.Distance = FLT_MAX;
-
-	// Get the shortest trace
-	FloorAngle = FMath::Min3(HitResultForward.Distance, HitResultLeft.Distance, HitResultRight.Distance) / 100.f;
-
+			// If the line trace is null, its distance is automatically 0. Make it max float so the others are shorter. 
+			if (!Traces[CurrentTrace])
+				TraceHitResults[CurrentTrace].Distance = FLT_MAX;
+			
+			TraceDistances[CurrentTrace] = TraceHitResults[CurrentTrace].Distance;
+			++CurrentTrace;
+		}
+	}
+	
+	// Get the shortest trace. Divide by 100 to make it 0-1. 
+	FloorAngle = FindSmallestFloat(TraceDistances) * 0.01f;
+	
 	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
 	{
 		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
@@ -279,7 +307,8 @@ void AMyCharacter::HandleJumpInput()
 		LatentActionManager.RemoveActionsForObject(this);
 
 		// Jump in backward direction 
-		GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, JumpImpulseUp) - GetActorForwardVector() * JumpImpulseBack);
+		SetPlayerVelocity(FVector(0.f, 0.f, JumpImpulseUp/100) - GetActorForwardVector() * JumpImpulseBack/100);
+		SetActorRotation(FRotator(0, GetActorRotation().Yaw + 180, 0));
 		bHasReachedWallWhileSprinting = false;
 		return;
 	}
@@ -295,21 +324,20 @@ void AMyCharacter::HandleJumpInput()
 		if (GetCharacterMovement()->Velocity.Length() == 0)
 		{
 			bIsJumpingOutFromWall = true;
-			// GetCharacterMovement()->Velocity = FVector(0.f, 0.f, VelocityClimbJumpOutUp) - GetActorForwardVector() * VelocityClimbJumpOutBack;
-			GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, ClimbJumpOutImpulseUp) - GetActorForwardVector() * ClimbJumpOutImpulseBack);
+			SetPlayerVelocity(FVector(0.f, 0.f, VelocityClimbJumpOutUp) - GetActorForwardVector() * VelocityClimbJumpOutBack);
 			SetActorRotation(FRotator(0, GetActorRotation().Yaw + 180, 0));
 			return;
 		}
 
 		// Jump in direction of movement input 
-		GetCharacterMovement()->AddImpulse(CharacterMovement * JumpImpulseUp);
+		SetPlayerVelocity(CharacterMovement * JumpImpulseUp/100);
 		return;
 	}
 	
 	if (BCanJumpBackwards() && !GetCharacterMovement()->IsMovingOnGround())
-		GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, JumpImpulseUp) + CharacterMovement * JumpImpulseBack);
+		SetPlayerVelocity(FVector(0.f, 0.f, JumpImpulseUp / 100) + CharacterMovement * JumpImpulseBack / 100);
 	else if (BCanJumpBackwards() && GetCharacterMovement()->IsMovingOnGround())
-		GetCharacterMovement()->AddImpulse(CharacterMovement * JumpImpulseBack);
+		SetPlayerVelocity(CharacterMovement * JumpImpulseBack / 100);
 	
 	if (GetCharacterMovement()->IsMovingOnGround() && !bIsExhausted)
 	{
@@ -339,6 +367,37 @@ void AMyCharacter::HandleSprintStop()
 		return;
 
 	CurrentState = Eps_Walking;
+}
+
+void AMyCharacter::SetMovementSpeed(const float TargetSpeed) const
+{
+	FMath::Clamp(TargetSpeed, 0, MaxSprintSpeed);
+	const auto Alpha = TargetSpeed < GetCharacterMovement()->MaxWalkSpeed ? ReachTargetDownSpeed : ReachTargetUpSpeed;
+
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Lerp(
+		GetCharacterMovement()->MaxWalkSpeed,
+		TargetSpeed,
+		Alpha * GetWorld()->DeltaTimeSeconds
+		);
+}
+
+void AMyCharacter::StopMovementOverTime()
+{
+	CheckShouldStopMovementOverTime();
+
+	if (!bShouldStopMovementOverTime)
+		return;
+	
+	const auto Movement = GetActorForwardVector() * GetCharacterMovement()->MaxWalkSpeed;
+	AddMovementInput(Movement);
+}
+
+void AMyCharacter::CheckShouldStopMovementOverTime()
+{
+	if (bShouldStopMovementOverTime || GetCharacterMovement()->MaxWalkSpeed < 450.f)
+		return;
+	
+	bShouldStopMovementOverTime = true;
 }
 
 bool AMyCharacter::BCanJumpBackwards() const
@@ -443,7 +502,6 @@ void AMyCharacter::FindClimbRotation()
 	if (WallRotationTrace)
 	{
 		setrot:
-
 		if (bIsJumpingOutFromWall && CurrentClimbingWall == HitResultPlayerRotation.GetActor())
 			return;
 
@@ -649,6 +707,18 @@ void AMyCharacter::HandleActionInput()
 	}
 }
 
+float AMyCharacter::FindSmallestFloat(TArray<float> Array)
+{
+	float SmallestValue = FLT_MAX;
+	for(int i = 0; i < Array.Num(); i++)
+	{
+		if (Array[i] < SmallestValue)
+			SmallestValue = Array[i];
+	}
+	
+	return SmallestValue;
+}
+
 void AMyCharacter::RunUpToWall()
 {
 	if (CurrentState != Eps_Sprinting || bHasReachedWallWhileSprinting)
@@ -761,6 +831,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	MovementOutput();
 	CameraMovementOutput();
 	CheckFloorAngle();
+	// SetMovementSpeed();
 	
 	/* Climbing */
 	CheckExhaustion();
