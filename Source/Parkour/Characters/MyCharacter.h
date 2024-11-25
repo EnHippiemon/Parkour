@@ -53,6 +53,19 @@
 // Make the line trace length's max and min values into 0-1
 // Use that to scale both speed and energy depletion seamlessly
 
+// Walk on top of wall / jump on pillars:
+// - Raycast shortly in front to ground and straight below. If not running, stop forward
+//	 movement and only allow rotation. If straight below is hitting a pillar
+// - Linetrace below character and forward. 
+// - Several linetraces that span from below to below & slightly in front, look for
+//   pillar to stand on. If pillar is found, move to that location (could in future be
+//   implemented like in Assassin's Creed, where the character is jump-running or jumping to
+//	 grab a ledge).
+// - If a trace is found slightly in front (meaning character is on a wall, looking sideways),
+//	 then allow movement in that direction. 
+// - Running and raycast shortly in front can't see floor, do the linetrace below character
+//	 and forward. If pillar is found, automatically perform jump. Disable character rotation?
+
 // Known issues:
 // - Currently the player automatically stops sprinting after aiming. Otherwise you don't need
 //   to hold down shift to run.
@@ -62,7 +75,10 @@
 //   not in any direction to jump backwards?
 // 
 // - If jumping to side close to ground while climbing, it
-//   doesn't set movement to walking 
+//   doesn't set movement to walking
+//
+// - When wall jumping, continually add velocity to not lose momentum.
+//   If landed or is climbing, the force stops.
 
 // DECLARE_MULTICAST_DELEGATE_OneParam()
 

@@ -585,47 +585,53 @@ void AMyCharacter::CameraMovementOutput()
 	
 	CameraMovement = FVector2D(GetCameraMovementX(), GetCameraMovementY());
 
-	// Rotation
+	// Add rotation
 	AddControllerYawInput(CameraMovement.X * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
 	AddControllerPitchInput(-CameraMovement.Y * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
 
-	// Vector offset 
+	// Set camera offset in relation to character based on character movement
+	// Check if character is moving 
 	if (GetCharacterMovement()->Velocity.Length() > 0.1f)
 	{
-		if ((CharacterMovement.Rotation().Vector() - FollowCamera->GetRightVector()).Length() > 1.8f)
+		constexpr float LeftThreshold = 1.8f;
+		constexpr float RightThreshold = 0.8f;
+		
+		// Sideways camera movement. Check if character's movement is towards left or right side of camera. 
+		if ((CharacterMovement.Rotation().Vector() - FollowCamera->GetRightVector()).Length() > LeftThreshold)
 				SetCurrentOffset(CurrentCameraOffsetY, -CameraYDirectionSpeed, CameraClamp.Y);
-
-		else if ((CharacterMovement.Rotation().Vector() - FollowCamera->GetRightVector()).Length() < 0.8f)
+		
+		else if ((CharacterMovement.Rotation().Vector() - FollowCamera->GetRightVector()).Length() < RightThreshold)
 				SetCurrentOffset(CurrentCameraOffsetY, CameraYDirectionSpeed, CameraClamp.Y);
 
+		// Upwards camera movement (while climbing!)
 		if (CurrentState == Eps_Climbing
-		&& (CharacterMovement.Rotation().Vector() - FollowCamera->GetUpVector()).Length() > 1.8f)
+		&& (CharacterMovement.Rotation().Vector() - FollowCamera->GetUpVector()).Length() > LeftThreshold)
 			SetCurrentOffset(CurrentCameraOffsetZ, -CameraYDirectionSpeed, CameraClamp.Z);
-	
+		
 		else if (CurrentState == Eps_Climbing
-		&& (CharacterMovement.Rotation().Vector() - FollowCamera->GetUpVector()).Length() < 0.8f)
+		&& (CharacterMovement.Rotation().Vector() - FollowCamera->GetUpVector()).Length() < RightThreshold)
 			SetCurrentOffset(CurrentCameraOffsetZ, CameraYDirectionSpeed, CameraClamp.Z);
 	}
 
-	float CameraSpeed;	
-	if (CurrentState == Eps_Climbing)
-	{
-		CameraSpeed = CameraYDirectionSpeed * 2;
-		if (CameraMovement.Y < -0.005f)
-				SetCurrentOffset(CurrentCameraOffsetZ, -CameraSpeed, CameraClamp.Z);
-
-		else if (CameraMovement.Y > 0.005f)
-				SetCurrentOffset(CurrentCameraOffsetZ, CameraSpeed, CameraClamp.Z);
-	}
-	else
+	// Camera offset by mouse input 
+	float CameraSpeed;
+	constexpr float InputSensitivityThreshold = 0.005f;
+	if (CurrentState != Eps_Climbing)
 	{
 		CameraSpeed = CameraYDirectionSpeed / (CharacterMovement.Length() + 1);
-		if (CameraMovement.X < -0.005f)
-				SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
-
-		else if (CameraMovement.X > 0.005f)
-				SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
+		if (CameraMovement.X < -InputSensitivityThreshold)
+			SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
+		else if (CameraMovement.X > InputSensitivityThreshold)
+			SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
+		return;
 	}
+
+	// If climbing 
+	CameraSpeed = CameraYDirectionSpeed * 2;
+	if (CameraMovement.Y < -InputSensitivityThreshold)
+		SetCurrentOffset(CurrentCameraOffsetZ, -CameraSpeed, CameraClamp.Z);
+	else if (CameraMovement.Y > InputSensitivityThreshold)
+		SetCurrentOffset(CurrentCameraOffsetZ, CameraSpeed, CameraClamp.Z);
 }
 
 void AMyCharacter::CheckIdleness()
