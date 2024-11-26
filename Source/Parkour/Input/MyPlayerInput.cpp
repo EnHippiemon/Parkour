@@ -38,6 +38,11 @@ void AMyPlayerInput::HandleSidewaysMovementInput(const float Value)
 	CharacterMovementSideways = Value * GetWorld()->DeltaTimeSeconds;
 }
 
+void AMyPlayerInput::SetCameraInputVector()
+{
+	CameraMovement = FVector2D(MouseMovementX, MouseMovementY);
+}
+
 void AMyPlayerInput::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
@@ -63,6 +68,8 @@ void AMyPlayerInput::BeginPlay()
 void AMyPlayerInput::Tick(float const DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	SetCameraInputVector();
 }
 
 void AMyPlayerInput::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

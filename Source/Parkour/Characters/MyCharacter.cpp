@@ -167,7 +167,8 @@ void AMyCharacter::MovementOutput()
 
 	if (CharacterMovement.Length() == 0)
 	{
-		if (GetCharacterMovement()->MaxWalkSpeed < 20.f || GetIsMidAir())
+		constexpr int SpeedToStop = 20;
+		if (GetCharacterMovement()->MaxWalkSpeed < SpeedToStop || GetIsMidAir())
 			bShouldStopMovementOverTime = false;
 		
 		SetMovementSpeed(0);
@@ -175,6 +176,9 @@ void AMyCharacter::MovementOutput()
 	}
 	else
 	{
+		if (GetCharacterMovement()->MaxWalkSpeed < ThresholdToStopOverTime)
+			bShouldStopMovementOverTime = false;
+		
 		SetMovementSpeed(TargetMovementSpeed);
 		AddMovementInput(CharacterMovement);
 	}
@@ -394,7 +398,37 @@ void AMyCharacter::StopMovementOverTime()
 
 void AMyCharacter::CheckShouldStopMovementOverTime()
 {
-	if (bShouldStopMovementOverTime || GetCharacterMovement()->MaxWalkSpeed < 450.f)
+	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	constexpr int DistanceToObstacle = 10;
+	const FVector TraceStart = GetActorLocation();
+	const FVector TraceEnd = GetActorLocation() + GetActorForwardVector() * DistanceToObstacle;	
+
+	const auto ObstacleTrace  = UKismetSystemLibrary::CapsuleTraceSingle(
+	GetWorld(),
+	TraceStart,
+	TraceEnd,
+	GetCapsuleComponent()->GetScaledCapsuleRadius(),
+	GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
+	ObstacleTraceType,
+	false,
+	{this},
+	EDrawDebugTrace::None,
+	HitResult,
+	true,
+	FLinearColor::Red,
+	FLinearColor::Green,
+	1.f
+	);
+
+	if (ObstacleTrace)
+	{
+		bShouldStopMovementOverTime = false;
+		return;
+	}
+	
+	if (bShouldStopMovementOverTime || GetCharacterMovement()->MaxWalkSpeed < ThresholdToStopOverTime)
 		return;
 	
 	bShouldStopMovementOverTime = true;
@@ -425,11 +459,12 @@ void AMyCharacter::FindClimbableWall()
 	const auto ActorLocation = GetActorLocation();
 	const auto ForwardVector = GetActorForwardVector();
 	const auto RightVector = GetActorRightVector();
-	
+
+	constexpr int TraceLength = 80;
 	const FVector StartWallAngle = ActorLocation;
-	const FVector EndForwardAngle = ActorLocation + ForwardVector * 80.f;
-	const FVector EndRightAngle = ActorLocation + ForwardVector * 80.f + RightVector * ClimbingSensitivityWidth;
-	const FVector EndLeftAngle = ActorLocation + ForwardVector * 80.f - RightVector * ClimbingSensitivityWidth;
+	const FVector EndForwardAngle = ActorLocation + ForwardVector * TraceLength;
+	const FVector EndRightAngle = ActorLocation + ForwardVector * TraceLength + RightVector * ClimbingSensitivityWidth;
+	const FVector EndLeftAngle = ActorLocation + ForwardVector * TraceLength - RightVector * ClimbingSensitivityWidth;
 
 	FHitResult HitResultForward;
 	FHitResult HitResultRight;
@@ -441,7 +476,7 @@ void AMyCharacter::FindClimbableWall()
 	const auto RightTrace = World->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
 	const auto LeftTrace = World->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ClimbingCollision, Parameters, FCollisionResponseParams());
 
-	// Check if LineTraces find the climbing wall. 
+	// Check if two LineTraces find a climbing wall. 
 	if (ForwardTrace && RightTrace ||
 		ForwardTrace && LeftTrace ||
 		RightTrace && LeftTrace)
@@ -468,6 +503,7 @@ void AMyCharacter::FindClimbRotation()
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
 
+	// Cache the getters, because all of them are used several times. 
 	const auto World = GetWorld();
 	const auto ActorLocation = GetActorLocation();
 	const auto ForwardVector = GetActorForwardVector();
@@ -564,7 +600,7 @@ void AMyCharacter::LookForLedge()
 		UKismetSystemLibrary::MoveComponentTo(
 			RootComponent,
 			LedgeClimbDestination,
-			GetActorRotation()/*LowHitResult.ImpactNormal.Rotation().GetInverse()*/,
+			GetActorRotation(),
 			true,
 			true,
 			LedgeClimbDuration,
@@ -583,11 +619,11 @@ void AMyCharacter::CameraMovementOutput()
 		return;
 	}
 	
-	CameraMovement = FVector2D(GetCameraMovementX(), GetCameraMovementY());
+	FVector2D const CameraMove = GetCameraMovement();
 
 	// Add rotation
-	AddControllerYawInput(CameraMovement.X * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
-	AddControllerPitchInput(-CameraMovement.Y * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
+	AddControllerYawInput(CameraMove.X * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
+	AddControllerPitchInput(-CameraMove.Y * CurrentCameraSpeed * GetWorld()->DeltaTimeSeconds);
 
 	// Set camera offset in relation to character based on character movement
 	// Check if character is moving 
@@ -619,18 +655,18 @@ void AMyCharacter::CameraMovementOutput()
 	if (CurrentState != Eps_Climbing)
 	{
 		CameraSpeed = CameraYDirectionSpeed / (CharacterMovement.Length() + 1);
-		if (CameraMovement.X < -InputSensitivityThreshold)
+		if (CameraMove.X < -InputSensitivityThreshold)
 			SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
-		else if (CameraMovement.X > InputSensitivityThreshold)
+		else if (CameraMove.X > InputSensitivityThreshold)
 			SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
 		return;
 	}
 
 	// If climbing 
 	CameraSpeed = CameraYDirectionSpeed * 2;
-	if (CameraMovement.Y < -InputSensitivityThreshold)
+	if (CameraMove.Y < -InputSensitivityThreshold)
 		SetCurrentOffset(CurrentCameraOffsetZ, -CameraSpeed, CameraClamp.Z);
-	else if (CameraMovement.Y > InputSensitivityThreshold)
+	else if (CameraMove.Y > InputSensitivityThreshold)
 		SetCurrentOffset(CurrentCameraOffsetZ, CameraSpeed, CameraClamp.Z);
 }
 
@@ -638,7 +674,7 @@ void AMyCharacter::CheckIdleness()
 {
 	TimeSinceMoved += GetWorld()->DeltaTimeSeconds;
 
-	if (GetCharacterMovement()->Velocity.Length() != 0.f || CameraMovement.Length() != 0.f)
+	if (GetCharacterMovement()->Velocity.Length() != 0.f || GetCameraMovement().Length() != 0.f)
 		TimeSinceMoved = 0.f;
 	
 	// Time in seconds before perceived as idle 
@@ -742,6 +778,14 @@ void AMyCharacter::RunUpToWall()
 	const FVector DistancedLookForWallEnd = GetActorLocation() + GetActorForwardVector() * DistanceBeforeAbleToRunUpWall;	
 	const auto DistancedLookForWall = GetWorld()->LineTraceSingleByChannel(DistancedLookForWallHitResult, TraceStart, DistancedLookForWallEnd, BlockAllCollision, Params, FCollisionResponseParams());
 
+	if (FoundWall != DistancedLookForWallHitResult.GetActor())
+	{
+		bIsNearingWall = false;
+		FoundWall = DistancedLookForWallHitResult.GetActor();
+	}
+	
+	DrawDebugLine(GetWorld(), TraceStart, DistancedLookForWallEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame, 0, 1);
+
 	if (!DistancedLookForWall)
 		bIsNearingWall = false;
 	
@@ -757,7 +801,7 @@ void AMyCharacter::RunUpToWall()
 		ObstacleTraceType,
 		false,
 		{this},
-		EDrawDebugTrace::None,
+		EDrawDebugTrace::ForOneFrame,
 		DistanceCapsuleHitResult,
 		true,
 		FLinearColor::Red,
@@ -775,7 +819,7 @@ void AMyCharacter::RunUpToWall()
 	const FVector TraceEnd = GetActorLocation() + GetActorForwardVector() * 40.f;
 	
 	const auto LookForWall = GetWorld()->LineTraceSingleByChannel(ShortWallSearchHitResult, TraceStart, TraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
-	if (LookForWall)
+	if (LookForWall && ShortWallSearchHitResult.GetActor() == FoundWall)
 	{
 		FHitResult CapsuleHitResult;
 		RunningUpWallEndLocation = GetActorLocation() + GetActorUpVector() * 200.f;
@@ -789,7 +833,7 @@ void AMyCharacter::RunUpToWall()
 			ObstacleTraceType,
 			false,
 			{this},
-			EDrawDebugTrace::ForDuration,
+			EDrawDebugTrace::ForOneFrame,
 			CapsuleHitResult,
 			true,
 			FLinearColor::Red,

@@ -186,6 +186,8 @@ private:
 			float ReachTargetDownSpeed = 3.f;
 			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
 			float MaxWalkSpeed = 600.f;
+			UPROPERTY(EditDefaultsOnly, Category="Sprinting|Slowing Down")
+			float ThresholdToStopOverTime = 450.f;
 				
 			float TargetMovementSpeed = 600.f;
 			bool bShouldStopMovementOverTime = false;
@@ -256,7 +258,9 @@ private:
 			float MaxSprintSpeed = 1000.f;
 		
 			FTimerHandle TimerRunningUpWall;
-			FVector RunningUpWallEndLocation; 
+			FVector RunningUpWallEndLocation;
+			UPROPERTY()
+			AActor* FoundWall; 
 			bool bIsNearingWall = false;
 			bool bHasReachedWallWhileSprinting = false;
 

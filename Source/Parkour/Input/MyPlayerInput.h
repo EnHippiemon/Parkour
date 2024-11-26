@@ -21,7 +21,6 @@ protected:
 
 	/* Movement */
 		FVector CharacterMovement;
-		FVector2D CameraMovement;
 	
 	/* Movement without input */
 		FLatentActionInfo LatentActionInfo;
@@ -34,8 +33,7 @@ protected:
 			float GetMovementForward() const { return CharacterMovementForward; }
 			float GetMovementSideways() const { return CharacterMovementSideways; }
 	
-			float GetCameraMovementX() const { return MouseMovementX; }
-			float GetCameraMovementY() const { return MouseMovementY; }
+			FVector2D GetCameraMovement() const { return CameraMovement; }
 	
 		/* Speed changes */
 			virtual void HandleSprintInput() {}
@@ -80,7 +78,9 @@ private:
 		/* Camera movement */
 		void HandleCameraInputX(const float Value);
 		void HandleCameraInputY(const float Value);
+		void SetCameraInputVector();
 
 		float MouseMovementX = 0.f;
 		float MouseMovementY = 0.f;
+		FVector2D CameraMovement;
 };
