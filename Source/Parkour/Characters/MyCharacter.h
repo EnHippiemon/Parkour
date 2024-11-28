@@ -205,11 +205,17 @@ private:
 			TEnumAsByte<ECollisionChannel> BlockAllCollision;
 			UPROPERTY(EditDefaultsOnly, Category=Energy)
 			float ExhaustionSpeed = 0.5f;
-		
+			UPROPERTY(EditDefaultsOnly, Category=Energy)
+			float EnergyRegainSpeed = 0.4f;
+			// The length the floor trace must be before losing energy
+			UPROPERTY(EditDefaultsOnly, Category=Energy)
+			float FloorAngleThreshold = 0.6f;
+			
 			float MovementEnergy = 1.00f;
 			float MovementSpeedPercent = 1.00f;
 			float FloorAngle = 1.00f;
 			bool bIsExhausted = false;
+			bool bCanGainEnergy = true;
 
 		/* Climbing */
 			UPROPERTY(EditDefaultsOnly, Category=Climbing)
@@ -218,6 +224,8 @@ private:
 			float AdjustPlayerRotationDistance = 15.f;
 			UPROPERTY(EditDefaultsOnly, Category=Climbing)
 			float ClimbingSensitivityWidth = 40.f;
+			UPROPERTY(EditDefaultsOnly, Category=Climbing)
+			float ClimbJumpingTime = 0.5f;
 
 			// Impulse or velocity? 
 			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
@@ -269,6 +277,10 @@ private:
 			float TimeBeforeIdle = 15.f;
 
 			float TimeSinceMoved = 0.f;
+
+		/* Sliding */
+			UPROPERTY(EditDefaultsOnly, Category=Sliding)
+			float ThresholdToSlideDown = 0.77f;
 	
 	/* Player States */ 
 		// Needs to be UPROPERTY if using Blueprints 

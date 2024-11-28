@@ -114,7 +114,7 @@ void AMyCharacter::PlayerStateSwitch()
 		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
 		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
 		// Makes sure that the player is pushed to the wall and doesn't fall off
-		if (CantClimbTimer >= 1.f)
+		if (CantClimbTimer >= ClimbJumpingTime)
 			GetCharacterMovement()->AddImpulse(GetActorForwardVector() * 1000.f);
 		break;		
 	default:
@@ -192,22 +192,22 @@ void AMyCharacter::SetPlayerVelocity(const FVector& Value) const
 
 void AMyCharacter::CheckFloorAngle()
 {
+	// Cache getters to increase performance 
 	const auto World = GetWorld();
+	const auto RightVector = GetActorRightVector();
 	constexpr int TraceLengthForward = 150;
 	constexpr int TraceLengthDown = 300;
-	const FVector StartFloorAngle = GetActorLocation();
-	const FVector EndForwardAngle = StartFloorAngle + GetActorForwardVector() * TraceLengthForward - GetActorUpVector() * TraceLengthDown;
 
-	constexpr int NumberOfTraces = 10;
-	constexpr int WidestPossibleTrace = 100;
-	TArray<FVector> TraceEnds;
-	TraceEnds.AddUninitialized(NumberOfTraces);
-	TArray<FHitResult> TraceHitResults;
-	TraceHitResults.AddUninitialized(NumberOfTraces);
-	TArray<bool> Traces;
-	Traces.AddUninitialized(NumberOfTraces);
+	// Trace vectors 
+	const FVector StartFloorTrace = GetActorLocation();
+	const FVector EndFloorTrace = StartFloorTrace + GetActorForwardVector() * TraceLengthForward - GetActorUpVector() * TraceLengthDown;
+
+	constexpr int TraceSeparation = 20;
+	int WidestPossibleTrace = 130;
+	// Increase the width to prevent zig zag cheating. 
+	if (!bCanGainEnergy)
+		WidestPossibleTrace = 300;
 	TArray<float> TraceDistances;
-	TraceDistances.AddUninitialized(NumberOfTraces);
 
 	FCollisionQueryParams Parameters;
 	Parameters.AddIgnoredActor(this);
@@ -215,25 +215,31 @@ void AMyCharacter::CheckFloorAngle()
 	int CurrentTrace = 0;
 	for (int i = -WidestPossibleTrace; i < WidestPossibleTrace; ++i)
 	{
-		// Multiply NumberOfTraces with 2 to compensate for counting both sides at the same time 
-		if (i % (NumberOfTraces * 2) == 1 || i % (NumberOfTraces * 2) == -1)
+		// Check both left and right sides at the same time 
+		if (i % TraceSeparation == 1 || i % TraceSeparation == -1)
 		{
-			TraceEnds[CurrentTrace] = FVector(EndForwardAngle + GetActorRightVector() * i);
-			Traces[CurrentTrace] = World->LineTraceSingleByChannel(TraceHitResults[CurrentTrace], StartFloorAngle, TraceEnds[CurrentTrace], BlockAllCollision, Parameters, FCollisionResponseParams());
+			FHitResult HitResult;
+			const FVector TraceEnds = FVector(EndFloorTrace + RightVector * i);
+			const auto Trace = World->LineTraceSingleByChannel(HitResult, StartFloorTrace,
+								   TraceEnds, BlockAllCollision, Parameters, FCollisionResponseParams());
 
 			// If the line trace is null, its distance is automatically 0. Make it max float so the others are shorter. 
-			if (!Traces[CurrentTrace])
-				TraceHitResults[CurrentTrace].Distance = FLT_MAX;
-			
-			TraceDistances[CurrentTrace] = TraceHitResults[CurrentTrace].Distance;
+			if (!Trace)
+				HitResult.Distance = FLT_MAX;
+
+			TraceDistances.Add(HitResult.Distance);
 			++CurrentTrace;
+
+			// Debug line for illustration in portfolio 
+			// DrawDebugLine(World, StartFloorTrace, TraceEnds, FColor::Red, false, EDrawDebugTrace::ForOneFrame, 0, 1.f);
 		}
 	}
 	
 	// Get the shortest trace. Divide by 100 to make it 0-1. 
 	FloorAngle = FindSmallestFloat(TraceDistances) * 0.01f;
-	
-	if (FloorAngle < 0.77f && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
+
+	// Decide if the player should slide down a wall 
+	if (FloorAngle < ThresholdToSlideDown && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
 	{
 		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
 		GetCharacterMovement()->GravityScale = 0.f;
@@ -269,32 +275,31 @@ void AMyCharacter::CheckExhaustion()
 		GetCharacterMovement()->Velocity.Length() > 0.f &&
 		CurrentState == Eps_Sprinting)
 	{
-		if (ScaledFloorAngle > 0.6f)
+		if (ScaledFloorAngle > FloorAngleThreshold)
 		{
+			bCanGainEnergy = false;
 			UsingEnergy = true;
 			MovementLoss = GetWorld()->DeltaTimeSeconds * ExhaustionSpeed * ScaledFloorAngle;			
 		}
 		else
+		{
+			bCanGainEnergy = true;
 			UsingEnergy = false;
+		}
 	}
 	else
 		UsingEnergy = false;
+
+	if (ScaledFloorAngle < FloorAngleThreshold)
+		bCanGainEnergy = true;
 	
-	if (MovementEnergy < 1.f && !UsingEnergy)
-		MovementEnergy += GetWorld()->DeltaTimeSeconds * ExhaustionSpeed;
+	if (MovementEnergy < 1.f && !UsingEnergy && bCanGainEnergy)
+		MovementEnergy += GetWorld()->DeltaTimeSeconds * EnergyRegainSpeed;
 	
 	// Decide movement speed
 	if (GetIsMidAir())
 		return;
-
-	// TO DO: Can this be removed? 
-	if (FloorAngle == 0.f)
-		FloorAngle = 1.f;
-	else if (FloorAngle < 0.8f)
-		FloorAngle = FloorAngle * FloorAngle * FloorAngle;	
-	else if (FloorAngle < 1.f)
-		FloorAngle *= FloorAngle;
-
+	
 	// Flip 0 and 1 so movement speed is increased with higher value. 
 	MovementSpeedPercent = FMath::Clamp(ScaledFloorAngle * - 1 + 1, 0, 2);
 
@@ -304,7 +309,7 @@ void AMyCharacter::CheckExhaustion()
 void AMyCharacter::HandleJumpInput()
 {
 	// When running up wall 
-	if (CurrentState != Eps_LeaveAiming && FloorAngle < 2.f && bHasReachedWallWhileSprinting)
+	if (bHasReachedWallWhileSprinting)
 	{
 		// Interrupt running
 		FLatentActionManager LatentActionManager = GetWorld()->GetLatentActionManager();
@@ -318,9 +323,9 @@ void AMyCharacter::HandleJumpInput()
 	}
 
 	// Jump while climbing 
-	if (CurrentState == Eps_Climbing && MovementEnergy > 0.f && CantClimbTimer >= 1.f)
+	if (CurrentState == Eps_Climbing && MovementEnergy > 0.f && CantClimbTimer >= ClimbJumpingTime)
 	{
-		CantClimbTimer = 0.5f;
+		CantClimbTimer = 0.f;
 		MovementEnergy -= 0.3f;
 		GetCharacterMovement()->BrakingDecelerationFlying = 1000.f;
 
@@ -436,7 +441,7 @@ void AMyCharacter::CheckShouldStopMovementOverTime()
 
 bool AMyCharacter::BCanJumpBackwards() const
 {
-	if (FloorAngle < 0.77f && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
+	if (FloorAngle < ThresholdToSlideDown && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
 		return true;
 	return false;
 }
@@ -448,7 +453,7 @@ bool AMyCharacter::GetIsMidAir() const
 
 void AMyCharacter::FindClimbableWall()
 {
-	if (CantClimbTimer < 1.f)
+	if (CantClimbTimer < ClimbJumpingTime)
 	{
 		CantClimbTimer += GetWorld()->DeltaTimeSeconds;
 		FindClimbRotation();
@@ -650,24 +655,23 @@ void AMyCharacter::CameraMovementOutput()
 	}
 
 	// Camera offset by mouse input 
-	float CameraSpeed;
 	constexpr float InputSensitivityThreshold = 0.005f;
-	if (CurrentState != Eps_Climbing)
-	{
-		CameraSpeed = CameraYDirectionSpeed / (CharacterMovement.Length() + 1);
-		if (CameraMove.X < -InputSensitivityThreshold)
-			SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
-		else if (CameraMove.X > InputSensitivityThreshold)
-			SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
-		return;
-	}
 
-	// If climbing 
-	CameraSpeed = CameraYDirectionSpeed * 2;
-	if (CameraMove.Y < -InputSensitivityThreshold)
-		SetCurrentOffset(CurrentCameraOffsetZ, -CameraSpeed, CameraClamp.Z);
-	else if (CameraMove.Y > InputSensitivityThreshold)
-		SetCurrentOffset(CurrentCameraOffsetZ, CameraSpeed, CameraClamp.Z);
+	float CameraSpeed = CameraYDirectionSpeed / (CharacterMovement.Length() + 1);
+	if (CurrentState == Eps_Climbing)
+	{
+		CameraSpeed = CameraYDirectionSpeed * 2;
+		if (CameraMove.Y < -InputSensitivityThreshold)
+			SetCurrentOffset(CurrentCameraOffsetZ, -CameraSpeed, CameraClamp.Z);
+		else if (CameraMove.Y > InputSensitivityThreshold)
+			SetCurrentOffset(CurrentCameraOffsetZ, CameraSpeed, CameraClamp.Z);
+	}
+	
+	if (CameraMove.X < -InputSensitivityThreshold)
+		SetCurrentOffset(CurrentCameraOffsetY, -CameraSpeed, CameraClamp.Y);
+	else if (CameraMove.X > InputSensitivityThreshold)
+		SetCurrentOffset(CurrentCameraOffsetY, CameraSpeed, CameraClamp.Y);
+	
 }
 
 void AMyCharacter::CheckIdleness()
@@ -689,7 +693,8 @@ void AMyCharacter::HandleSecondaryActionInput()
 {
 	if (CurrentState == Eps_Idle
 		|| GetCharacterMovement()->IsMovingOnGround()
-		|| bIsExhausted)
+		|| bIsExhausted
+		|| bHasReachedWallWhileSprinting)
 		return;
 
 	// Save current state for later
@@ -731,7 +736,8 @@ void AMyCharacter::HandleActionInput()
 	const auto HookTrace = GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, HookCollision, Parameters, FCollisionResponseParams());
 	if (HookTrace)
 	{
-		TargetLocation = HookshotTarget.Location - FollowCamera->GetForwardVector() * 50.f - FVector(0, 0, 100.f);
+		const FVector TargetOffset = FollowCamera->GetForwardVector() * 50.f + FVector(0, 0, 100.f);
+		TargetLocation = HookshotTarget.Location - TargetOffset;
 		bIsUsingHookshot = true;
 		CurrentState = Eps_LeaveAiming;
 		
@@ -816,13 +822,15 @@ void AMyCharacter::RunUpToWall()
 		return;
 	
 	FHitResult ShortWallSearchHitResult;
-	const FVector TraceEnd = GetActorLocation() + GetActorForwardVector() * 40.f;
+	auto constexpr DistanceToWall = 40;
+	const FVector TraceEnd = GetActorLocation() + GetActorForwardVector() * DistanceToWall;
 	
 	const auto LookForWall = GetWorld()->LineTraceSingleByChannel(ShortWallSearchHitResult, TraceStart, TraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
 	if (LookForWall && ShortWallSearchHitResult.GetActor() == FoundWall)
 	{
 		FHitResult CapsuleHitResult;
-		RunningUpWallEndLocation = GetActorLocation() + GetActorUpVector() * 200.f;
+		auto constexpr RunDistance = 200;
+		RunningUpWallEndLocation = GetActorLocation() + GetActorUpVector() * RunDistance;
 		
 		auto CapsuleTrace = UKismetSystemLibrary::CapsuleTraceSingle(
 			GetWorld(),
@@ -833,7 +841,7 @@ void AMyCharacter::RunUpToWall()
 			ObstacleTraceType,
 			false,
 			{this},
-			EDrawDebugTrace::ForOneFrame,
+			EDrawDebugTrace::ForDuration,
 			CapsuleHitResult,
 			true,
 			FLinearColor::Red,
@@ -881,7 +889,6 @@ void AMyCharacter::Tick(float const DeltaTime)
 	MovementOutput();
 	CameraMovementOutput();
 	CheckFloorAngle();
-	// SetMovementSpeed();
 	
 	/* Climbing */
 	CheckExhaustion();
