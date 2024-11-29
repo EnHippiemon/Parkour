@@ -159,13 +159,25 @@ private:
 			float SprintingSpringArmLength = 600.f;
 			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
 			float StopAimingSpringArmLength = 400.f;
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
+			float TraceLengthWallBehindPlayer = 200.f;
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
+			float ArmLengthWallBehindPlayer = 1000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
+			float ResetTimeWallBehindPlayer = 1.f;
 
+			float TimeSinceWallBehindPlayer = 0.f;
+	
 		/* Spring arm extension speed */ 
 			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
 			float SpringArmSwitchSpeed = 0.05f;
 			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
 			float NormalCameraSwitchSpeed = 0.02f;
-	
+
+		/* Spring arm target offset */
+			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm")
+			FVector ClimbingSpringArmTargetOFfset = FVector(-200, 0, 0);;
+
 	/* Hookshot */ 
 		// Higher is slower
 		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
@@ -197,6 +209,8 @@ private:
 			float JumpImpulseUp = 50000.f;
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
 			float JumpImpulseBack = 50000.f;
+			UPROPERTY(EditDefaultsOnly, Category=Jump)
+			float ThresholdToJumpBack = 0.77f;
 
 		/* Energy */
 			UPROPERTY(EditDefaultsOnly, Category=Energy)
@@ -277,10 +291,6 @@ private:
 			float TimeBeforeIdle = 15.f;
 
 			float TimeSinceMoved = 0.f;
-
-		/* Sliding */
-			UPROPERTY(EditDefaultsOnly, Category=Sliding)
-			float ThresholdToSlideDown = 0.77f;
 	
 	/* Player States */ 
 		// Needs to be UPROPERTY if using Blueprints 
@@ -337,6 +347,7 @@ private:
 			virtual void HandleSecondaryActionInput() override;
 			virtual void HandleSecondaryActionStop() override;
 			void SetCurrentOffset(float& Value, const float Speed, const float Clamp) const;
+			void CheckWallBehindPlayer();
 
 	/* Hookshot */
 		virtual void HandleActionInput() override;

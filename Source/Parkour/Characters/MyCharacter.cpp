@@ -111,6 +111,7 @@ void AMyCharacter::PlayerStateSwitch()
 			CurrentState = SavedState;
 		break;
 	case Eps_Climbing:
+		SpringArm->TargetOffset = FMath::Lerp(SpringArm->TargetOffset, GetActorForwardVector() * ClimbingSpringArmTargetOFfset, SpringArmSwitchSpeed);
 		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, StandardSpringArmLength, NormalCameraSwitchSpeed);
 		FollowCamera->FieldOfView = FMath::Lerp(FollowCamera->FieldOfView, WalkingFOV, NormalCameraSwitchSpeed);
 		// Makes sure that the player is pushed to the wall and doesn't fall off
@@ -127,7 +128,10 @@ void AMyCharacter::PlayerStateSwitch()
 		SetPlayerVelocity(FVector(0, 0, 0));
 	
 	if (CurrentState != Eps_Climbing)
+	{
 		CurrentCameraOffsetZ = FMath::Lerp(CurrentCameraOffsetZ, 0.f, NormalCameraSwitchSpeed);
+		SpringArm->TargetOffset = FMath::Lerp(SpringArm->TargetOffset, FVector(0, 0, 0), SpringArmSwitchSpeed);
+	}
 	
 	if (CurrentState != Eps_Aiming)
 		SpringArm->SocketOffset = FMath::Lerp(SpringArm->SocketOffset, FVector(
@@ -239,7 +243,7 @@ void AMyCharacter::CheckFloorAngle()
 	FloorAngle = FindSmallestFloat(TraceDistances) * 0.01f;
 
 	// Decide if the player should slide down a wall 
-	if (FloorAngle < ThresholdToSlideDown && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
+	if (FloorAngle < ThresholdToJumpBack && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
 	{
 		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
 		GetCharacterMovement()->GravityScale = 0.f;
@@ -441,7 +445,7 @@ void AMyCharacter::CheckShouldStopMovementOverTime()
 
 bool AMyCharacter::BCanJumpBackwards() const
 {
-	if (FloorAngle < ThresholdToSlideDown && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
+	if (FloorAngle < ThresholdToJumpBack && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f)
 		return true;
 	return false;
 }
@@ -718,6 +722,34 @@ void AMyCharacter::SetCurrentOffset(float& Value, const float Speed, const float
 	Value = FMath::Clamp(Value, -Clamp, Clamp);
 }
 
+void AMyCharacter::CheckWallBehindPlayer()
+{
+	const auto World = GetWorld();
+	const bool bHasNoWallForDuration = TimeSinceWallBehindPlayer > ResetTimeWallBehindPlayer;
+	if (!bHasNoWallForDuration)
+		TimeSinceWallBehindPlayer += World->DeltaTimeSeconds;
+	
+	if (CurrentState != Eps_Climbing && FloorAngle > ThresholdToJumpBack && !bHasReachedWallWhileSprinting && bHasNoWallForDuration)
+		return;
+	
+	// DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
+	if (!bHasNoWallForDuration)
+		SpringArm->TargetArmLength = FMath::Lerp(SpringArm->TargetArmLength, ArmLengthWallBehindPlayer, SpringArmSwitchSpeed);
+	
+	const auto ActorLocation = GetActorLocation();
+	const auto ForwardVector = GetActorForwardVector();
+	const auto TraceStart = ActorLocation - ForwardVector * 20;
+	const auto TraceEnd = ActorLocation - ForwardVector * TraceLengthWallBehindPlayer;
+
+	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	
+	const auto Trace = World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
+	if (Trace)
+		TimeSinceWallBehindPlayer = 0;
+}
+
 // Look for target to hook to with hookshot
 void AMyCharacter::HandleActionInput()
 {
@@ -790,7 +822,7 @@ void AMyCharacter::RunUpToWall()
 		FoundWall = DistancedLookForWallHitResult.GetActor();
 	}
 	
-	DrawDebugLine(GetWorld(), TraceStart, DistancedLookForWallEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame, 0, 1);
+	// DrawDebugLine(GetWorld(), TraceStart, DistancedLookForWallEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame, 0, 1);
 
 	if (!DistancedLookForWall)
 		bIsNearingWall = false;
@@ -807,7 +839,7 @@ void AMyCharacter::RunUpToWall()
 		ObstacleTraceType,
 		false,
 		{this},
-		EDrawDebugTrace::ForOneFrame,
+		EDrawDebugTrace::None,
 		DistanceCapsuleHitResult,
 		true,
 		FLinearColor::Red,
@@ -841,7 +873,7 @@ void AMyCharacter::RunUpToWall()
 			ObstacleTraceType,
 			false,
 			{this},
-			EDrawDebugTrace::ForDuration,
+			EDrawDebugTrace::None,
 			CapsuleHitResult,
 			true,
 			FLinearColor::Red,
@@ -894,6 +926,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	CheckExhaustion();
 	FindClimbableWall();
 	LookForLedge();
+	CheckWallBehindPlayer();
 	
 	/* Running */
 	RunUpToWall();
