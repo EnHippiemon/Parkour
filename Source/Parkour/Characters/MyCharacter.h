@@ -341,6 +341,8 @@ private:
 		UPROPERTY(EditDefaultsOnly, Category=UI)
 		UTexture2D* ClimbJumpTexture;
 		UPROPERTY(EditDefaultsOnly, Category=UI)
+		UTexture2D* WallJumpTexture;
+		UPROPERTY(EditDefaultsOnly, Category=UI)
 		UTexture2D* JumpTexture;
 		UPROPERTY(EditDefaultsOnly, Category=UI)
 		UTexture2D* AimingTexture;

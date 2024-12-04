@@ -25,7 +25,8 @@ void AMyCharacter::PlayerStateSwitch()
 			SpringArm->CameraLagSpeed = 20.f;
 			SpringArm->CameraLagMaxDistance = 3.f;
 			GetCharacterMovement()->bOrientRotationToMovement = true;
-			SetCurrentMovementMode(Ecmm_Walking);
+			if (!bIsExhausted)
+				SetCurrentMovementMode(Ecmm_Walking);
 			break;
 		case Eps_Sprinting:
 			GetCharacterMovement()->SetWalkableFloorAngle(90.f);
@@ -50,7 +51,8 @@ void AMyCharacter::PlayerStateSwitch()
 			GetCharacterMovement()->bOrientRotationToMovement = true;
 			GetCharacterMovement()->bUseControllerDesiredRotation = false;
 			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
-			SetCurrentMovementMode(Ecmm_LeavingAim);
+			if (bIsUsingHookshot)
+				SetCurrentMovementMode(Ecmm_LeavingAim);
 			break;
 		case Eps_Climbing:
 			GetCharacterMovement()->MovementMode = MOVE_Flying;
@@ -234,7 +236,7 @@ void AMyCharacter::SetCurrentMovementMode(ECurrentMovementMode Movement)
 		CurrentMovementTexture = RunUpWallTexture;
 		break;
 	case Ecmm_WallJumping:
-		CurrentMovementTexture = ClimbJumpTexture;
+		CurrentMovementTexture = WallJumpTexture;
 		break;
 	case Ecmm_Aiming:
 		CurrentMovementTexture = AimingTexture;
@@ -318,8 +320,9 @@ void AMyCharacter::CheckExhaustion()
 {
 	float MovementLoss = 0.f;
 	
-	if (MovementEnergy >= 1.f)
+	if (MovementEnergy >= 1.f && bIsExhausted)
 	{
+		SetCurrentMovementMode(Ecmm_Walking);
 		bIsExhausted = false;
 	}
 	
@@ -336,11 +339,21 @@ void AMyCharacter::CheckExhaustion()
 	
 	// UE_LOG(LogTemp, Warning, TEXT("Corrected floor: %f | Scaled floor: %f | Floor angle: %f"), CorrectedFloorAngle, ScaledFloorAngle, FloorAngle);
 	
-	if (MovementEnergy > 0.f &&
-		GetCharacterMovement()->Velocity.Length() > 0.f &&
+	if (/*GetCharacterMovement()->Velocity.Length() > 0.f &&*/
 		CurrentState == Eps_Sprinting)
 	{
-		if (ScaledFloorAngle > FloorAngleThreshold)
+		// Checking if on ground
+		constexpr int MinDistanceToGround = 10;
+		const FVector TraceDownStart = GetActorLocation() - GetCapsuleComponent()->GetScaledCapsuleHalfHeight() *
+									   GetActorUpVector() - GetActorForwardVector() * GetCapsuleComponent()->GetScaledCapsuleRadius();
+		const FVector TraceDownEnd = TraceDownStart - GetActorUpVector() * MinDistanceToGround;
+		DrawDebugLine(GetWorld(), TraceDownStart, TraceDownEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
+		FHitResult HitResult;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		const auto TraceDown = GetWorld()->LineTraceSingleByChannel(HitResult, TraceDownStart, TraceDownEnd, BlockAllCollision, Params, FCollisionResponseParams());
+	
+		if (ScaledFloorAngle > FloorAngleThreshold && !TraceDown)
 		{
 			bCanGainEnergy = false;
 			UsingEnergy = true;
@@ -373,6 +386,9 @@ void AMyCharacter::CheckExhaustion()
 
 void AMyCharacter::HandleJumpInput()
 {
+	if (bIsExhausted)
+		return;
+	
 	// When running up wall 
 	if (bHasReachedWallWhileSprinting)
 	{
@@ -389,7 +405,7 @@ void AMyCharacter::HandleJumpInput()
 	}
 
 	// Jump while climbing 
-	if (CurrentState == Eps_Climbing && MovementEnergy > 0.f && CantClimbTimer >= ClimbJumpingTime)
+	if (CurrentState == Eps_Climbing /*&& MovementEnergy > 0.f*/ && CantClimbTimer >= ClimbJumpingTime)
 	{
 		CantClimbTimer = 0.f;
 		MovementEnergy -= 0.3f;
@@ -411,7 +427,18 @@ void AMyCharacter::HandleJumpInput()
 		return;
 	}
 
-	if (BCanJumpBackwards())
+	// Wall jumping
+	constexpr int MinDistanceToGround = 25;
+	const FVector TraceDownStart = GetActorLocation() - GetCapsuleComponent()->GetScaledCapsuleHalfHeight() *
+								   GetActorUpVector() - GetActorForwardVector() * GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const FVector TraceDownEnd = TraceDownStart - GetActorUpVector() * MinDistanceToGround;
+	DrawDebugLine(GetWorld(), TraceDownStart, TraceDownEnd, FColor::Red, false, 3);
+	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	const auto TraceDown = GetWorld()->LineTraceSingleByChannel(HitResult, TraceDownStart, TraceDownEnd, BlockAllCollision, Params, FCollisionResponseParams());
+	
+	if (BCanJumpBackwards() && !TraceDown)
 	{
 		SetCurrentMovementMode(Ecmm_WallJumping);
 		if (GetCharacterMovement()->IsMovingOnGround())
@@ -420,15 +447,8 @@ void AMyCharacter::HandleJumpInput()
 			SetPlayerVelocity(FVector(0.f, 0.f, JumpImpulseUp / 100) + CharacterMovement * JumpImpulseBack / 100);
 		return;
 	}
-	// if (BCanJumpBackwards() && !GetCharacterMovement()->IsMovingOnGround())
-	// {
-	//
-	// 	SetPlayerVelocity(FVector(0.f, 0.f, JumpImpulseUp / 100) + CharacterMovement * JumpImpulseBack / 100);
-	// }
-	// else if (BCanJumpBackwards() && GetCharacterMovement()->IsMovingOnGround())
-	// 	SetPlayerVelocity(CharacterMovement * JumpImpulseBack / 100);
-	//
-	if (GetCharacterMovement()->IsMovingOnGround() && !bIsExhausted)
+
+	if (GetCharacterMovement()->IsMovingOnGround())
 	{
 		SetCurrentMovementMode(Ecmm_Jumping);
 		MovementEnergy -= 0.3f;
@@ -440,7 +460,9 @@ void AMyCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Super::Landed(Hit);
 
-	SetCurrentMovementMode(CurrentState == Eps_Sprinting ? Ecmm_Sprinting : Ecmm_Walking);
+	if (!bIsExhausted)
+		SetCurrentMovementMode(CurrentState == Eps_Sprinting ? Ecmm_Sprinting : Ecmm_Walking);
+	
 	bHasReachedWallWhileSprinting = false;
 }
 
@@ -603,39 +625,51 @@ void AMyCharacter::FindClimbRotation()
 	const auto CapsuleRadius = GetCapsuleComponent()->GetScaledCapsuleRadius() * 0.5f;
 	const auto MovementSideways = GetMovementSideways();
 	const auto MovementForward = GetMovementForward();
-	
-	const FVector StartBackWallDetection = ActorLocation + ForwardVector * CapsuleRadius;
-	const FVector EndBackWallDetection = ActorLocation + UpVector * MovementForward * 4000 + RightVector * MovementSideways * 4000 - ForwardVector * 30.f;
-	auto WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartBackWallDetection, EndBackWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
-	
-	if (!WallRotationTrace)
-	{
-		const FVector StartSideWallDetection = ActorLocation;
-		const FVector EndSideWallDetection = ActorLocation + MovementSideways * RightVector * 5000.f;
-		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartSideWallDetection, EndSideWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
-		if (WallRotationTrace)
-			goto setrot;
-	
-		const FVector StartFrontWallDetection = ActorLocation - ForwardVector * CapsuleRadius;
-		const FVector EndFrontWallDetection = ActorLocation + UpVector * MovementForward * AdjustPlayerRotationDistance + RightVector * MovementSideways * AdjustPlayerRotationDistance + ForwardVector * 80.f;
-		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartFrontWallDetection, EndFrontWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
-		if (WallRotationTrace)
-			goto setrot;
-	
-		const FVector EndEyesightWallDetection = ActorLocation + ForwardVector * 100.f;
-		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, ActorLocation, EndEyesightWallDetection, ClimbingCollision, Parameters, FCollisionResponseParams());
-	}
-	
-	if (WallRotationTrace)
-	{
-		setrot:
-		if (bIsJumpingOutFromWall && CurrentClimbingWall == HitResultPlayerRotation.GetActor())
-			return;
 
-		bIsJumpingOutFromWall = false;
-		CurrentClimbingWall = HitResultPlayerRotation.GetActor();
-		SetPlayerRotation(HitResultPlayerRotation.ImpactNormal.Rotation());
+	TArray<FVector> StartTraces;
+	TArray<FVector> EndTraces;
+
+#pragma region Vectors
+	const FVector StartBackWallDetection = ActorLocation + ForwardVector * CapsuleRadius;
+	StartTraces.Add(StartBackWallDetection);
+	const FVector EndBackWallDetection = ActorLocation + UpVector * MovementForward * 4000 + RightVector * MovementSideways * 4000 - ForwardVector * 30.f;
+	EndTraces.Add(EndBackWallDetection);
+
+	const FVector StartSideWallDetection = ActorLocation;
+	StartTraces.Add(StartSideWallDetection);
+	const FVector EndSideWallDetection = ActorLocation + MovementSideways * RightVector * 5000.f;
+	EndTraces.Add(EndSideWallDetection);
+	
+	const FVector StartFrontWallDetection = ActorLocation - ForwardVector * CapsuleRadius;
+	StartTraces.Add(StartFrontWallDetection);
+	const FVector EndFrontWallDetection = ActorLocation + UpVector * MovementForward * AdjustPlayerRotationDistance + RightVector *
+										  MovementSideways * AdjustPlayerRotationDistance + ForwardVector * 80.f;
+	EndTraces.Add(EndFrontWallDetection);
+
+	const FVector StartEyesightWallDetection = ActorLocation;
+	StartTraces.Add(StartEyesightWallDetection);
+	const FVector EndEyesightWallDetection = ActorLocation + ForwardVector * 100.f;
+	EndTraces.Add(EndEyesightWallDetection);
+#pragma endregion
+	
+	bool WallRotationTrace = false;
+	for (int i = 0; i < StartTraces.Num(); ++i)
+	{
+		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartTraces[i], EndTraces[i], ClimbingCollision, Parameters, FCollisionResponseParams());
+		DrawDebugLine(World, StartTraces[i], EndTraces[i], FColor::Red, false, EDrawDebugTrace::ForOneFrame);
+		if (WallRotationTrace)
+			break;
 	}
+
+	if (!WallRotationTrace)
+		return;
+	
+	if (bIsJumpingOutFromWall && CurrentClimbingWall == HitResultPlayerRotation.GetActor())
+		return;
+
+	bIsJumpingOutFromWall = false;
+	CurrentClimbingWall = HitResultPlayerRotation.GetActor();
+	SetPlayerRotation(HitResultPlayerRotation.ImpactNormal.Rotation());
 }
 
 void AMyCharacter::SetPlayerRotation(const FRotator& TargetRotation)
@@ -892,6 +926,8 @@ void AMyCharacter::RunUpToWall()
 		return;
 	}
 
+	const auto World = GetWorld();
+	
 	FHitResult DistancedLookForWallHitResult;
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(this);
@@ -910,27 +946,11 @@ void AMyCharacter::RunUpToWall()
 	if (!DistancedLookForWall)
 		bIsNearingWall = false;
 	
-	FHitResult DistanceCapsuleHitResult;
+	FHitResult DistancedHitResult;
 	const FVector DistancedTraceEnd = DistancedLookForWallEnd - GetActorForwardVector() * 50;
+	const auto DistancedWallTrace = World->LineTraceSingleByChannel(DistancedHitResult, TraceStart, DistancedTraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
 
-	const auto DistancedCapsuleTrace = UKismetSystemLibrary::CapsuleTraceSingle(
-		GetWorld(),
-		TraceStart,
-		DistancedTraceEnd,
-		GetCapsuleComponent()->GetScaledCapsuleRadius(),
-		GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
-		ObstacleTraceType,
-		false,
-		{this},
-		EDrawDebugTrace::None,
-		DistanceCapsuleHitResult,
-		true,
-		FLinearColor::Red,
-		FLinearColor::Green,
-		1.f
-		);
-
-	if (DistancedLookForWall && !DistancedCapsuleTrace)
+	if (DistancedLookForWall && !DistancedWallTrace)
 		bIsNearingWall = true;
 	
 	if (!bIsNearingWall)
