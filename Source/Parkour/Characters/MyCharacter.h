@@ -4,7 +4,14 @@
 #include "../Input/MyPlayerInput.h"
 #include "MyCharacter.generated.h"
 
-// To do:
+// To do with abstraction:
+// - Change all camera and spring arm stuff to send their new
+//	 component scripts instead.
+// - Send delegates from MyCharacter to tell them about new
+//	 states and changes. Alternatively, have them use a getter.
+//	 ... nvm. That would have to be in tick and not very efficient. 
+
+
 // After mentoring with Martin:
 // - Situational cameras. Such as:
 //   - When climbing and there is a wall behind that you could jump to,
@@ -80,9 +87,10 @@
 // - When wall jumping, continually add velocity to not lose momentum.
 //   If landed or is climbing, the force stops.
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNewMovement);
 
+class UMyCameraComponent;
 // Needs to be UENUM if using Blueprints
+UENUM(BlueprintType)
 enum EPlayerState
 {
 	Eps_Walking,
@@ -110,6 +118,12 @@ enum ECurrentMovementMode
 	Ecmm_Exhausted
 };
 
+class UMySpringArmComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNewMovement);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPlayerState, NewState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCanJumpBackChanged, bool, CanJumpBack);
+
 UCLASS()
 class PARKOUR_API AMyCharacter : public AMyPlayerInput
 {
@@ -123,81 +137,19 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnNewMovement OnNewMovement;
+	UPROPERTY(BlueprintAssignable)
+	FOnStateChanged OnStateChanged;
+	UPROPERTY(BlueprintAssignable)
+	FOnCanJumpBackChanged OnCanJumpBackChanged;
 
 	UTexture2D* GetCurrentMovementTexture() { return CurrentMovementTexture; }
+
+	FVector GetLocation() const { return GetActorLocation(); }
+	
+	// bool GetCanJumpBack() { return bCanJumpBack; }
 	
 private:
 #pragma region ---------- VARIABLES -----------
-	/* Camera */
-		/* Camera speed */
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraSpeed")
-			float StandardCameraSpeed = 5000.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraSpeed")
-			float AimCameraSpeed = 50000.f;
-
-		/* Camera position */
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPosition")
-			FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
-			
-			// Decides how far to the sides the camera can move.
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPosition")
-			FVector CameraClamp = FVector(0.f, 200.f, 100.f);
-
-			float CurrentCameraOffsetY = 150.f;
-			float CurrentCameraOffsetZ = 0.f;
-		
-		/* Camera positioning speed */ 
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-			float AimingCameraTransitionAlpha = 0.3f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-			float StandardRotationRate = 500.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-			float AimRotationRate = 30000.f;
-		
-			// Decides how quickly the camera moves from side to side. 
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-			float CameraYDirectionSpeed = 1000.f;
-		
-			float CurrentCameraSpeed;
-
-		/* Camera field of view (FOV) */ 
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
-			float StillFOV = 60.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
-			float WalkingFOV = 70.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
-			float SprintingFOV = 125.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
-			float SprintFOVSpeed = 0.3f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraFieldOfView")
-			float AimingFOV = 70.f;
-
-	/* Spring Arm */
-		/* Spring arm length */
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-			float StandardSpringArmLength = 400.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-			float SprintingSpringArmLength = 600.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-			float StopAimingSpringArmLength = 400.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-			float TraceLengthWallBehindPlayer = 200.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-			float ArmLengthWallBehindPlayer = 1000.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-			float ResetTimeWallBehindPlayer = 1.f;
-
-			float TimeSinceWallBehindPlayer = 0.f;
-	
-		/* Spring arm extension speed */ 
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
-			float SpringArmSwitchSpeed = 0.05f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
-			float NormalCameraSwitchSpeed = 0.02f;
-
-		/* Spring arm target offset */
-			UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm")
-			FVector ClimbingSpringArmTargetOffset = FVector(-200, 0, 0);;
 
 	/* Hookshot */ 
 		// Higher is slower
@@ -221,7 +173,11 @@ private:
 			float MaxWalkSpeed = 600.f;
 			UPROPERTY(EditDefaultsOnly, Category="Sprinting|Slowing Down")
 			float ThresholdToStopOverTime = 450.f;
-				
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
+			float StandardRotationRate = 500.f;
+			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
+			float AimRotationRate = 30000.f;
+
 			float TargetMovementSpeed = 600.f;
 			bool bShouldStopMovementOverTime = false;
 	
@@ -232,6 +188,7 @@ private:
 			float JumpImpulseBack = 50000.f;
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
 			float ThresholdToJumpBack = 0.77f;
+			bool bCanJumpBack = false;
 
 		/* Energy */
 			UPROPERTY(EditDefaultsOnly, Category=Energy)
@@ -371,11 +328,12 @@ private:
 			void SetMovementSpeed(const float TargetSpeed) const;
 			void StopMovementOverTime();
 			void CheckShouldStopMovementOverTime();
+			void CheckIfCanJumpBack();
 
 		/* Jumping */
 			virtual void HandleJumpInput() override;
 			virtual void Landed(const FHitResult& Hit) override;
-			bool BCanJumpBackwards() const;
+			bool SetCanJumpBackwards() const;
 			bool GetIsMidAir() const;
 		
 		/* Climbing */
@@ -392,15 +350,10 @@ private:
 			void RunningUpWall();
 
 	/* Camera movement */
-		/* Basic camera movement */
-			void CameraMovementOutput();
-
 		/* Camera changes */
 			void CheckIdleness();
 			virtual void HandleSecondaryActionInput() override;
 			virtual void HandleSecondaryActionStop() override;
-			void SetCurrentCameraOffset(float& Value, const float Speed, const float Clamp) const;
-			void CheckWallBehindPlayer();
 
 	/* Hookshot */
 		virtual void HandleActionInput() override;
@@ -411,5 +364,5 @@ private:
 	/* Inherited functions */
 		virtual void BeginPlay() override;
 		virtual void Tick(float DeltaTime) override;
-#pragma endregion 
+#pragma endregion
 };

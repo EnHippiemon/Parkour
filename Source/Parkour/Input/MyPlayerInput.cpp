@@ -1,24 +1,20 @@
 #include "MyPlayerInput.h"
 
-#include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/SpringArmComponent.h"
+#include "Parkour/Characters/MyCameraComponent.h"
+#include "Parkour/Characters/MySpringArmComponent.h"
 
 AMyPlayerInput::AMyPlayerInput()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	SpringArm = CreateDefaultSubobject<USpringArmComponent>("SpringArm");
-	SpringArm->SetupAttachment(RootComponent);
-	SpringArm->bUsePawnControlRotation = true;
-	SpringArm->bEnableCameraRotationLag = true;
-	SpringArm->CameraRotationLagSpeed = 50.f;
-	SpringArm->CameraLagSpeed = 20.f;
-	SpringArm->CameraLagMaxDistance = 3.f;
-	
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
-	FollowCamera->SetupAttachment(SpringArm);
-	FollowCamera->bUsePawnControlRotation = false;
 
+	SpringArm = CreateDefaultSubobject<UMySpringArmComponent>("SpringArm");
+	SpringArm->SetupAttachment(GetCapsuleComponent());
+
+	CameraComponent = CreateDefaultSubobject<UMyCameraComponent>("CameraComponent");
+	CameraComponent->SetupAttachment(SpringArm);
+	
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->bUseControllerDesiredRotation = false;
 	GetCharacterMovement()->AirControl = 0.3f;

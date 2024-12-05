@@ -4,9 +4,9 @@
 #include "GameFramework/Character.h"
 #include "MyPlayerInput.generated.h"
 
+class UMySpringArmComponent;
+class UMyCameraComponent;
 class USceneComponent;
-class USpringArmComponent;
-class UCameraComponent;
 
 UCLASS()
 class PARKOUR_API AMyPlayerInput : public ACharacter
@@ -15,6 +15,10 @@ class PARKOUR_API AMyPlayerInput : public ACharacter
 
 public:	
 	AMyPlayerInput();
+
+	FVector GetCharacterInput() { return CharacterMovement; }
+	FVector2D GetCameraInput() const { return CameraMovement; }
+
 
 protected:
 	/* ---------- VARIABLES ----------- */
@@ -33,7 +37,6 @@ protected:
 			float GetMovementForward() const { return CharacterMovementForward; }
 			float GetMovementSideways() const { return CharacterMovementSideways; }
 	
-			FVector2D GetCameraMovement() const { return CameraMovement; }
 	
 		/* Speed changes */
 			virtual void HandleSprintInput() {}
@@ -60,11 +63,12 @@ protected:
 
 	
 	/* ---------- Attach components ---------- */
-	
-		UPROPERTY(VisibleAnywhere, Category=Camera)
-		USpringArmComponent* SpringArm;
-		UPROPERTY(VisibleAnywhere, Category=Camera)
-		UCameraComponent* FollowCamera;
+
+		// Necessary for details panel in blueprint 
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		UMySpringArmComponent* SpringArm;
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		UMyCameraComponent* CameraComponent;
 
 private:
 	/* Basic movement */
