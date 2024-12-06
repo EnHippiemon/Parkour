@@ -14,67 +14,86 @@ class PARKOUR_API UMySpringArmComponent : public USpringArmComponent
 {
 	GENERATED_BODY()
 
+private:
+	
 	UMySpringArmComponent();
 
-private:
-	/* Camera */
-	/* Camera speed */
-	UPROPERTY(EditDefaultsOnly, Category="Camera|CameraSpeed")
-	float StandardCameraSpeed = 5000.f;
-	UPROPERTY(EditDefaultsOnly, Category="Camera|CameraSpeed")
-	float AimCameraSpeed = 50000.f;
-	
-	// Decides how quickly the camera moves from side to side. 
-	UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-	float CameraYDirectionSpeed = 1000.f;
+#pragma region ------------ Variables -------------
+	/* Rotation */
+		UPROPERTY(EditDefaultsOnly, Category="Rotation")
+		float StandardRotationSpeed = 5000.f;
+		UPROPERTY(EditDefaultsOnly, Category="Rotation")
+		float AimingRotationSpeed = 50000.f;
 		
-	float CurrentCameraSpeed;
-	/* Spring Arm */
-	/* Spring arm length */
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-	float StandardSpringArmLength = 350.f;
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-	float SprintingSpringArmLength = 350.f;
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-	float StopAimingSpringArmLength = 300.f;
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-	float TraceLengthWallBehindPlayer = 275.f;
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-	float ArmLengthWallBehindPlayer = 1000.f;
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringArmLength")
-	float ResetTimeWallBehindPlayer = 1.f;
+		float RotationSpeed;
 
-	float TimeSinceWallBehindPlayer = 0.f;
+	/* Offset */
+		/* Spring arm socket offset */
+			UPROPERTY(EditDefaultsOnly, Category="Offset|Socket")
+			FVector ClimbingSpringArmTargetOffset = FVector(-70, 0, 0);;
+			UPROPERTY(EditDefaultsOnly, Category="Offset|Socket")
+			FVector OffsetClamp = FVector(0.f, 200.f, 100.f);
+
+			float CurrentCameraOffsetY = 150.f;
+			float CurrentCameraOffsetZ = 0.f;
+
+		/* Spring arm target offset */
+			// Decides how far to the sides the camera can move.
+			UPROPERTY(EditDefaultsOnly, Category="Offset|Target")
+			FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
+
+		/* Offset speed */
+			// Decides how quickly the camera moves from side to side. 
+			UPROPERTY(EditDefaultsOnly, Category="Offset|Speed")
+			float CameraYDirectionSpeed = 1000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Offset|Speed")
+			float ClimbingOffsetSpeed = 0.01f;
+			UPROPERTY(EditDefaultsOnly, Category="Offset|Speed")
+			float AimingOffsetSpeed = 0.3f;
 	
+	/* Spring arm length */
+		UPROPERTY(EditDefaultsOnly, Category="SpringArmLength")
+		float WalkingSpringArmLength = 350.f;
+		UPROPERTY(EditDefaultsOnly, Category="SpringArmLength")
+		float SprintingSpringArmLength = 350.f;
+		UPROPERTY(EditDefaultsOnly, Category="SpringArmLength")
+		float HookshotSpringArmLength = 300.f;
+		UPROPERTY(EditDefaultsOnly, Category="SpringArmLength")
+		float IdleSpringArmLength = 10000.f;
+		UPROPERTY(EditDefaultsOnly, Category="SpringArmLength")
+		float AimingSpringArmLength = 100.f;
+		UPROPERTY(EditDefaultsOnly, Category="SpringArmLength")
+		float ClimbingSpringArmLength = 350.f;
+
+
 	/* Spring arm extension speed */ 
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
-	float SpringArmSwitchSpeed = 0.01f;
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm|SpringExtensionSpeed")
-	float NormalCameraSwitchSpeed = 0.02f;
+		UPROPERTY(EditDefaultsOnly, Category="ExtensionSpeed")
+		float SprintExtensionSpeed = 0.01f;
+		UPROPERTY(EditDefaultsOnly, Category="ExtensionSpeed")
+		float WalkingExtensionSpeed = 0.02f;
+		UPROPERTY(EditDefaultsOnly, Category="ExtensionSpeed")
+		float IdleExtensionSpeed = 0.0001f;
+		UPROPERTY(EditDefaultsOnly, Category="ExtensionSpeed")
+		float AimingExtensionSpeed = 0.3f;
+		UPROPERTY(EditDefaultsOnly, Category="ExtensionSpeed")
+		float HookshotExtensionSpeed = 0.02f;
+		UPROPERTY(EditDefaultsOnly, Category="ExtensionSpeed")
+		float ClimbingExtensionSpeed = 0.02f;
 
-	/* Spring arm target offset */
-	UPROPERTY(EditDefaultsOnly, Category="Camera|SpringArm")
-	FVector ClimbingSpringArmTargetOffset = FVector(-70, 0, 0);;
+	/* Situational */
+		/* Wall behind player */
+			UPROPERTY(EditDefaultsOnly, Category="Situational|WallBehindPlayer")
+			float TraceLengthWallBehindPlayer = 275.f;
+			UPROPERTY(EditDefaultsOnly, Category="Situational|WallBehindPlayer")
+			float ArmLengthWallBehindPlayer = 1000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Situational|WallBehindPlayer")
+			float ResetTimeWallBehindPlayer = 1.f;
 
-	/* Camera position */
+			float TimeSinceWallBehindPlayer = 0.f;
+			bool bWallIsInFront = false;
 
-	// Decides how far to the sides the camera can move.
-	UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPosition")
-	FVector AimingCameraOffset = FVector(0.f, 50.f, -10.f);
-
-	UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPosition")
-	FVector CameraClamp = FVector(0.f, 200.f, 100.f);
-
-	float CurrentCameraOffsetY = 150.f;
-	float CurrentCameraOffsetZ = 0.f;
-
-	/* Camera positioning speed */ 
-	UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-	float AimingCameraTransitionAlpha = 0.3f;
-
-
-	bool bCanJumpBack = false;
-
+#pragma endregion
+	
 	void CameraMovementOutput();
 	void CalculateCameraOffset(FVector2D CameraMove);
 	void SetCameraOffset();
@@ -83,7 +102,7 @@ private:
 	void StateSwitch(EPlayerState State);
 
 	UFUNCTION()
-	void UpdateCanJumpBack(bool CanJumpBack);
+	void UpdateWallIsInFront(bool CanJumpBack);
 
 	void TickStateSwitch();
 	void CameraLerp(float& Value, float Speed, float Clamp) const;

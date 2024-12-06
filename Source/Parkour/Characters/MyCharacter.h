@@ -9,10 +9,22 @@
 //	 component scripts instead.
 // - Send delegates from MyCharacter to tell them about new
 //	 states and changes. Alternatively, have them use a getter.
-//	 ... nvm. That would have to be in tick and not very efficient. 
+//	 ... nvm. That would have to be in tick and not very efficient.
 
 
 // After mentoring with Martin:
+//
+// 2:
+// - Create an obstacle course, like a pyramid
+// - Remove unnecessary text in portfolio
+// - Create a self reflection / retrospect tab in portfolio instead.
+// - Mention FindClimbRotation? No longer using goto but a for loop instead.
+// - Where could I put the PNGs? 
+// - Data classes/structs that contain the variables from h-file.
+// - Maybe abstract more (create a state manager etc. All states have their
+//   own scripts.
+//    
+// 1:
 // - Situational cameras. Such as:
 //   - When climbing and there is a wall behind that you could jump to,
 //	   zoom out so you can see them both clearer
@@ -145,9 +157,7 @@ public:
 	UTexture2D* GetCurrentMovementTexture() { return CurrentMovementTexture; }
 
 	FVector GetLocation() const { return GetActorLocation(); }
-	
-	// bool GetCanJumpBack() { return bCanJumpBack; }
-	
+
 private:
 #pragma region ---------- VARIABLES -----------
 
@@ -183,12 +193,13 @@ private:
 	
 		/* Jumping */ 
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float JumpImpulseUp = 50000.f;
+			float JumpUpVelocity = 1000.f;
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float JumpImpulseBack = 50000.f;
+			float JumpBackVelocity = 1000.f;
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
 			float ThresholdToJumpBack = 0.77f;
-			bool bCanJumpBack = false;
+
+			bool bWallIsInFront = false;
 
 		/* Energy */
 			UPROPERTY(EditDefaultsOnly, Category=Energy)
@@ -212,29 +223,32 @@ private:
 		/* Climbing */
 			UPROPERTY(EditDefaultsOnly, Category=Climbing)
 			TEnumAsByte<ECollisionChannel> ClimbingCollision;
+			// Distance to check wall surface normal for rotation correction
 			UPROPERTY(EditDefaultsOnly, Category=Climbing)
-			float AdjustPlayerRotationDistance = 15.f;
+			float PlayerToWallDistance = 15.f;
 			UPROPERTY(EditDefaultsOnly, Category=Climbing)
-			float ClimbingSensitivityWidth = 40.f;
-			UPROPERTY(EditDefaultsOnly, Category=Climbing)
-			float ClimbJumpingTime = 0.5f;
+			float ClimbingWidth = 40.f;
 
-			// Impulse or velocity? 
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float ClimbJumpOutImpulseUp = 55000.f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float ClimbJumpOutImpulseBack = 60000.f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float VelocityClimbJumpOutUp = 550.f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float VelocityClimbJumpOutBack = 600.f;
-	
-			float CantClimbTimer = 0.f;
-			bool bIsJumpingOutFromWall;
-			UPROPERTY()
-			AActor* CurrentClimbingWall;
+			/* Climb jump */// Impulse or velocity? 
+				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+				float ClimbJumpingTime = 0.5f;
+				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+				float ClimbJumpOutImpulseUp = 55000.f;
+				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+				float ClimbJumpOutImpulseBack = 60000.f;
+				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+				float VelocityClimbJumpOutUp = 550.f;
+				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+				float VelocityClimbJumpOutBack = 600.f;
+		
+				float CantClimbTimer = 0.f;
+				bool bIsJumpingOutFromWall;
+				UPROPERTY()
+				AActor* CurrentClimbingWall;
 
 			/* Ledge climbing */
+				UPROPERTY (EditDefaultsOnly, Category="Climbing|Ledge")
+				float BottomLedgeDetectionZOffset = 70.f;
 				UPROPERTY (EditDefaultsOnly, Category="Climbing|Ledge")
 				FVector LedgeClimbDetectionOffset = FVector(50.f, 0.f, 100.f);
 				UPROPERTY(EditDefaultsOnly, Category="Climbing|Ledge")
@@ -251,7 +265,7 @@ private:
 			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
 			float DistanceBeforeAbleToRunUpWall = 300.f;
 			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-			float RunningUpWallSpeed = 20.f;
+			float RunningUpWallTimeInSeconds = 20.f;
 			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
 			float DistanceToRunUpWall = 200.f;
 			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
@@ -328,12 +342,12 @@ private:
 			void SetMovementSpeed(const float TargetSpeed) const;
 			void StopMovementOverTime();
 			void CheckShouldStopMovementOverTime();
-			void CheckIfCanJumpBack();
+			void CheckIfWallIsInFront();
 
 		/* Jumping */
 			virtual void HandleJumpInput() override;
 			virtual void Landed(const FHitResult& Hit) override;
-			bool SetCanJumpBackwards() const;
+			bool GetCanJumpBackwards() const;
 			bool GetIsMidAir() const;
 		
 		/* Climbing */

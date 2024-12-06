@@ -33,30 +33,30 @@ void UMyCameraComponent::TickStateSwitch()
 	{
 	case Eps_Walking:
 		FieldOfView = Player->GetCharacterMovement()->Velocity.Length() == 0
-		? FieldOfView = FMath::Lerp(FieldOfView, StillFOV, 0.02f)
-		: FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.005f);
+		? FieldOfView = FMath::Lerp(FieldOfView, StillFOV, StillFOVSpeed)
+		: FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, WalkingFOVSpeed);
 		break;
 	case Eps_Sprinting:
 		FieldOfView = FMath::Lerp(FieldOfView, SprintingFOV, SprintFOVSpeed);
 		break;
 	case Eps_Idle:
-		FieldOfView = FMath::Lerp(FieldOfView, 60.f, 0.0001f);
+		FieldOfView = FMath::Lerp(FieldOfView, IdleFOV, IdleFOVSpeed);
 		break;
 	case Eps_Aiming:
-		FieldOfView = FMath::Lerp(FieldOfView, AimingFOV, 0.3f);
+		FieldOfView = FMath::Lerp(FieldOfView, AimingFOV, AimingFOVSpeed);
 		break;
 	case Eps_LeaveAiming:
-		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.02f);
+		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, WalkingFOVSpeed);
 		break;
 	case Eps_Climbing:
-		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.02f);
+		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, ClimbingFOVSpeed);
 		break;
 	default:
 		break;
 	}
 	
-	if (CurrentState != Eps_Idle)
-		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.001f);
+	// if (CurrentState != Eps_Idle)
+	// 	FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.001f);
 }
 
 void UMyCameraComponent::BeginPlay()
