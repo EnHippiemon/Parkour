@@ -45,6 +45,10 @@
 // - Remove magic numbers to a reasonable extent 
 // - Cinematic camera?
 
+// Smoother camera:
+// - Make the offset at which the camera attached to the spring arm
+//	 lerp towards the position that is now. Makes sure there is
+//	 never a jagged camera. 
 
 // - Make a fancy function for the floor angle & movement energy
 // - ? Separate camera when sprinting for a long time, or in special areas ?
@@ -158,6 +162,8 @@ public:
 	
 	FVector GetLocation() const { return GetActorLocation(); }
 
+	float GetSlowMotionTimeDilation() const { return SlowMotionDilation; }
+
 private:
 #pragma region ---------- VARIABLES -----------
 
@@ -191,11 +197,13 @@ private:
 			float TargetMovementSpeed = 600.f;
 			bool bShouldStopMovementOverTime = false;
 	
-		/* Jumping */ 
+		/* Jumping */
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float JumpUpVelocity = 1000.f;
+			float RegularJumpForce = 100000.f;
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float JumpBackVelocity = 1000.f;
+			float WallJumpUpVelocity = 1000.f;
+			UPROPERTY(EditDefaultsOnly, Category=Jump)
+			float WallJumpBackVelocity = 1000.f;
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
 			float ThresholdToJumpBack = 0.77f;
 
@@ -283,6 +291,10 @@ private:
 			float TimeBeforeIdle = 15.f;
 
 			float TimeSinceMoved = 0.f;
+
+	/* Time dilation */
+		UPROPERTY(EditDefaultsOnly, Category=TimeDilation)
+		float SlowMotionDilation = 0.05f;
 	
 	/* Player States */ 
 		// Needs to be UPROPERTY if using Blueprints 

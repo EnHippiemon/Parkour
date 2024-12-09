@@ -33,10 +33,10 @@ void AMyCharacter::PlayerStateSwitch()
 			SetCurrentMovementMode(Ecmm_Idle);
 			break;
 		case Eps_Aiming:
+			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), SlowMotionDilation);
 			GetCharacterMovement()->bOrientRotationToMovement = false;
 			GetCharacterMovement()->bUseControllerDesiredRotation = true;
 			GetCharacterMovement()->RotationRate = FRotator(0.f, AimRotationRate, 0.f);
-			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.05f);
 			SetCurrentMovementMode(Ecmm_Aiming);
 			break;
 		case Eps_LeaveAiming:
@@ -359,7 +359,7 @@ void AMyCharacter::HandleJumpInput()
 		LatentActionManager.RemoveActionsForObject(this);
 
 		// Jump in backward direction 
-		SetPlayerVelocity(FVector(0.f, 0.f, JumpUpVelocity) - GetActorForwardVector() * JumpBackVelocity);
+		SetPlayerVelocity(FVector(0.f, 0.f, WallJumpUpVelocity) - GetActorForwardVector() * WallJumpBackVelocity);
 		SetActorRotation(FRotator(0, GetActorRotation().Yaw + 180, 0));
 		bHasReachedWallWhileSprinting = false;
 		SetCurrentMovementMode(Ecmm_WallJumping);
@@ -387,7 +387,7 @@ void AMyCharacter::HandleJumpInput()
 		SetCurrentMovementMode(Ecmm_ClimbJumping);
 		
 		// Jump in direction of movement input 
-		SetPlayerVelocity(CharacterMovement * JumpUpVelocity);
+		SetPlayerVelocity(CharacterMovement * WallJumpUpVelocity);
 		return;
 	}
 
@@ -405,10 +405,19 @@ void AMyCharacter::HandleJumpInput()
 	if (GetCanJumpBackwards() && !TraceDown)
 	{
 		SetCurrentMovementMode(Ecmm_WallJumping);
+
 		if (GetCharacterMovement()->IsMovingOnGround())
-			SetPlayerVelocity(CharacterMovement * JumpBackVelocity);
+		{
+			if (CurrentState == Eps_Sprinting)
+			{
+				constexpr int SprintCompensationForce = 100;
+				GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, WallJumpUpVelocity * SprintCompensationForce) + CharacterMovement * WallJumpBackVelocity * SprintCompensationForce);
+			}
+			else
+				GetCharacterMovement()->AddImpulse(CharacterMovement * WallJumpBackVelocity);
+		}
 		else
-			SetPlayerVelocity(FVector(0.f, 0.f, JumpUpVelocity) + CharacterMovement * JumpBackVelocity);
+			SetPlayerVelocity(FVector(0.f, 0.f, WallJumpUpVelocity) + CharacterMovement * WallJumpBackVelocity);
 		return;
 	}
 
@@ -416,7 +425,7 @@ void AMyCharacter::HandleJumpInput()
 	{
 		SetCurrentMovementMode(Ecmm_Jumping);
 		MovementEnergy -= 0.3f;
-		Jump();
+		GetCharacterMovement()->AddImpulse(FVector(0, 0, RegularJumpForce));
 	}
 }
 

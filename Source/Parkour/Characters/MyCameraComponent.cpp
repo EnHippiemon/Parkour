@@ -23,12 +23,6 @@ void UMyCameraComponent::StateSwitch(EPlayerState State)
 
 void UMyCameraComponent::TickStateSwitch()
 {
-	if (!IsValid(Player))
-	{
-		UE_LOG(LogTemp, Error, TEXT("MyCameraComponent.cpp - No player found!"))
-		return;
-	}
-	
 	switch(CurrentState)
 	{
 	case Eps_Walking:
@@ -55,8 +49,8 @@ void UMyCameraComponent::TickStateSwitch()
 		break;
 	}
 	
-	// if (CurrentState != Eps_Idle)
-	// 	FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.001f);
+	if (CurrentState != Eps_Idle)
+		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.001f);
 }
 
 void UMyCameraComponent::BeginPlay()
@@ -75,5 +69,8 @@ void UMyCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (!IsValid(Player))
+		return;
+	
 	TickStateSwitch();
 }

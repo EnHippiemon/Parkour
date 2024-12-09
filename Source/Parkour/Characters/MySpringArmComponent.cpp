@@ -24,9 +24,6 @@ UMySpringArmComponent::UMySpringArmComponent()
 
 void UMySpringArmComponent::CameraMovementOutput()
 {
-	if (!IsValid(Player))
-		return;
-	
 	if (!IsValid(Player->Controller))
 	{
 		UE_LOG(LogTemp, Error, TEXT("MySpringArmComponent - no controller"));
@@ -69,9 +66,6 @@ void UMySpringArmComponent::CameraOffsetByLooking(const FVector2D CameraMove)
 // Set camera offset in relation to character based on character movement
 void UMySpringArmComponent::CameraOffsetByMovement()
 {
-	if (!IsValid(Player))
-		return;
-	
 	// Check if character is moving 
 	if (Player->GetCharacterMovement()->Velocity.Length() < 0.1f)
 		return;
@@ -80,6 +74,8 @@ void UMySpringArmComponent::CameraOffsetByMovement()
 	const auto Camera = Player->GetCamera();
 	const auto CameraRightVector = Camera->GetRightVector();
 
+	// ---------- TO DO: LOOK HERE ------------ 
+	// MIGHT BE THE WRONG THRESHOLD? 1.8 AND 0.2?
 	constexpr float LeftThreshold = 1.8f;
 	constexpr float RightThreshold = 0.8f;
 
@@ -114,6 +110,17 @@ void UMySpringArmComponent::SetCameraOffset()
 		SocketOffset = FMath::Lerp(SocketOffset, FVector(0.f, CurrentCameraOffsetY, CurrentCameraOffsetZ), WalkingExtensionSpeed);
 }
 
+void UMySpringArmComponent::SetRotationSpeed()
+{
+	if (bShouldRotateFast && RotationSpeed == AimingRotationSpeed)
+		return;
+	
+	if (bShouldRotateFast && UGameplayStatics::GetGlobalTimeDilation(GetWorld()) == Player->GetSlowMotionTimeDilation())
+		RotationSpeed = AimingRotationSpeed;
+	else
+		RotationSpeed = StandardRotationSpeed;
+}
+
 void UMySpringArmComponent::StateSwitch(EPlayerState State)
 {
 	switch(State)
@@ -127,11 +134,11 @@ void UMySpringArmComponent::StateSwitch(EPlayerState State)
 	case Eps_Idle:
 		break;
 	case Eps_Aiming:
-		RotationSpeed = AimingRotationSpeed;
+		bShouldRotateFast = true;
 		CameraRotationLagSpeed = 1000.f;
 		break;
 	case Eps_LeaveAiming:
-		RotationSpeed = StandardRotationSpeed;
+		bShouldRotateFast = false;
 		CameraRotationLagSpeed = 50.f;
 		break;
 	case Eps_Climbing:
@@ -180,9 +187,6 @@ void UMySpringArmComponent::TickStateSwitch()
 
 void UMySpringArmComponent::CheckWallBehindPlayer()
 {
-	if (!IsValid(Player))
-		return;
-	
 	const auto World = GetWorld();
 	
 	const bool bHasNoWallForDuration = TimeSinceWallBehindPlayer > ResetTimeWallBehindPlayer;
@@ -233,9 +237,14 @@ void UMySpringArmComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!IsValid(Player))
+		return;
+	
 	TickStateSwitch();
 	CheckWallBehindPlayer();
 	CameraMovementOutput();
 	CameraOffsetByMovement();
 	SetCameraOffset();
+	SetRotationSpeed();
 }

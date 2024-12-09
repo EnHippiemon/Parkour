@@ -26,6 +26,7 @@ private:
 		float AimingRotationSpeed = 50000.f;
 		
 		float RotationSpeed;
+		bool bShouldRotateFast = false;
 
 	/* Offset */
 		/* Spring arm socket offset */
@@ -98,6 +99,7 @@ private:
 	void CameraOffsetByLooking(FVector2D CameraMove);
 	void CameraOffsetByMovement();
 	void SetCameraOffset();
+	void SetRotationSpeed();
 	
 	UFUNCTION()
 	void StateSwitch(EPlayerState State);
