@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+// #include "Parkour/Characters/MyCameraComponent.h"
 #include "MyPlayerInput.generated.h"
 
 class UMySpringArmComponent;
@@ -16,9 +17,9 @@ class PARKOUR_API AMyPlayerInput : public ACharacter
 public:	
 	AMyPlayerInput();
 
-	FVector GetCharacterInput() { return CharacterMovement; }
+	FVector GetMovementInput() const { return CharacterMovement; }
 	FVector2D GetCameraInput() const { return CameraMovement; }
-
+	UMyCameraComponent* GetCamera() const { return CameraComponent; }
 
 protected:
 	/* ---------- VARIABLES ----------- */

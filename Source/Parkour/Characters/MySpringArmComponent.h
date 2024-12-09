@@ -95,7 +95,8 @@ private:
 #pragma endregion
 	
 	void CameraMovementOutput();
-	void CalculateCameraOffset(FVector2D CameraMove);
+	void CameraOffsetByLooking(FVector2D CameraMove);
+	void CameraOffsetByMovement();
 	void SetCameraOffset();
 	
 	UFUNCTION()

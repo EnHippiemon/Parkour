@@ -155,7 +155,7 @@ public:
 	FOnCanJumpBackChanged OnCanJumpBackChanged;
 
 	UTexture2D* GetCurrentMovementTexture() { return CurrentMovementTexture; }
-
+	
 	FVector GetLocation() const { return GetActorLocation(); }
 
 private:

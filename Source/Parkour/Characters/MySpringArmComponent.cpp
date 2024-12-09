@@ -3,6 +3,7 @@
 
 #include "../Characters/MySpringArmComponent.h"
 
+#include "MyCameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -28,12 +29,12 @@ void UMySpringArmComponent::CameraMovementOutput()
 	
 	if (!IsValid(Player->Controller))
 	{
-		UE_LOG(LogTemp, Error, TEXT("MyCharacter Line 125, no controller"));
+		UE_LOG(LogTemp, Error, TEXT("MySpringArmComponent - no controller"));
 		return;
 	}
 	
 	const FVector2D CameraMove = Player->GetCameraInput();
-	CalculateCameraOffset(CameraMove);
+	CameraOffsetByLooking(CameraMove);
 	
 	if (CameraMove == FVector2D(0, 0))
 		return;
@@ -43,42 +44,13 @@ void UMySpringArmComponent::CameraMovementOutput()
 	Player->AddControllerPitchInput(-CameraMove.Y * RotationSpeed * GetWorld()->DeltaTimeSeconds);
 }
 
-void UMySpringArmComponent::CalculateCameraOffset(FVector2D CameraMove)
+// Camera offset by mouse input 
+void UMySpringArmComponent::CameraOffsetByLooking(const FVector2D CameraMove)
 {
-	const FVector CharacterInput = Player->GetCharacterInput();
-	const auto CharacterMovement = Player->GetCharacterMovement();
-
-	// Set camera offset in relation to character based on character movement
-	// Check if character is moving 
-	if (CharacterMovement->Velocity.Length() > 0.1f)
-	{
-		constexpr float LeftThreshold = 1.8f;
-		constexpr float RightThreshold = 0.8f;
-
-		// --------- Character movement doesn't seem to work correctly?!?!?! -------------
-		// Maybe don't use character input, but actual character movement.
-		
-		// Sideways camera movement. Check if character's movement is towards left or right side of camera. 
-		if ((CharacterInput.Rotation().Vector() - GetRightVector()).Length() > LeftThreshold)
-			CameraLerp(CurrentCameraOffsetY, -CameraYDirectionSpeed, OffsetClamp.Y);
-		
-		else if ((CharacterInput.Rotation().Vector() - GetRightVector()).Length() < RightThreshold)
-			CameraLerp(CurrentCameraOffsetY, CameraYDirectionSpeed, OffsetClamp.Y);
-	
-		// Upwards camera movement (while climbing!)
-		if (CurrentState == Eps_Climbing
-		&& (CharacterInput.Rotation().Vector() - GetUpVector()).Length() > LeftThreshold)
-			CameraLerp(CurrentCameraOffsetZ, -CameraYDirectionSpeed, OffsetClamp.Z);
-		
-		else if (CurrentState == Eps_Climbing
-		&& (CharacterInput.Rotation().Vector() - GetUpVector()).Length() < RightThreshold)
-			CameraLerp(CurrentCameraOffsetZ, CameraYDirectionSpeed, OffsetClamp.Z);
-	}
-	
-	// Camera offset by mouse input 
+	const FVector CharacterForwardVector = Player->GetActorForwardVector();
 	constexpr float InputSensitivityThreshold = 0.005f;
 	
-	float CameraSpeed = CameraYDirectionSpeed / (CharacterInput.Length() + 1);
+	float CameraSpeed = CameraYDirectionSpeed / (CharacterForwardVector.Length() + 1);
 	if (CurrentState == Eps_Climbing)
 	{
 		CameraSpeed = CameraYDirectionSpeed * 2;
@@ -92,6 +64,42 @@ void UMySpringArmComponent::CalculateCameraOffset(FVector2D CameraMove)
 		CameraLerp(CurrentCameraOffsetY, -CameraSpeed, OffsetClamp.Y);
 	else if (CameraMove.X > InputSensitivityThreshold)
 		CameraLerp(CurrentCameraOffsetY, CameraSpeed, OffsetClamp.Y);
+}
+
+// Set camera offset in relation to character based on character movement
+void UMySpringArmComponent::CameraOffsetByMovement()
+{
+	if (!IsValid(Player))
+		return;
+	
+	// Check if character is moving 
+	if (Player->GetCharacterMovement()->Velocity.Length() < 0.1f)
+		return;
+
+	const auto CharacterMovement = Player->GetMovementInput();
+	const auto Camera = Player->GetCamera();
+	const auto CameraRightVector = Camera->GetRightVector();
+
+	constexpr float LeftThreshold = 1.8f;
+	constexpr float RightThreshold = 0.8f;
+
+	// Sideways camera movement. Check if character's movement is towards left or right side of camera. 
+	if ((CharacterMovement.Rotation().Vector() - CameraRightVector).Length() > LeftThreshold)
+		CameraLerp(CurrentCameraOffsetY, -CameraYDirectionSpeed, OffsetClamp.Y);
+	else if ((CharacterMovement.Rotation().Vector() - CameraRightVector).Length() < RightThreshold)
+		CameraLerp(CurrentCameraOffsetY, CameraYDirectionSpeed, OffsetClamp.Y);
+
+	if (CurrentState != Eps_Climbing)
+		return;
+	
+	constexpr float UpThreshold = 0.5f;
+	constexpr float DownThreshold = -0.5f;
+
+	// Upwards camera movement (while climbing!)
+	if (Player->GetMovementInput().Z > UpThreshold)
+		CameraLerp(CurrentCameraOffsetZ, CameraYDirectionSpeed, OffsetClamp.Z);
+	else if (Player->GetMovementInput().Z < DownThreshold)
+		CameraLerp(CurrentCameraOffsetZ, -CameraYDirectionSpeed, OffsetClamp.Z);
 }
 
 void UMySpringArmComponent::SetCameraOffset()
@@ -228,5 +236,6 @@ void UMySpringArmComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	TickStateSwitch();
 	CheckWallBehindPlayer();
 	CameraMovementOutput();
+	CameraOffsetByMovement();
 	SetCameraOffset();
 }
