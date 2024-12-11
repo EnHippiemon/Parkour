@@ -4,13 +4,14 @@
 #include "../Input/MyPlayerInput.h"
 #include "MyCharacter.generated.h"
 
-// To do with abstraction:
-// - Change all camera and spring arm stuff to send their new
-//	 component scripts instead.
-// - Send delegates from MyCharacter to tell them about new
-//	 states and changes. Alternatively, have them use a getter.
-//	 ... nvm. That would have to be in tick and not very efficient.
-
+// Add climbing energy:
+// Left click to push yourself and get more energy while climbing.
+// The amount of energy that is restored gets smaller the longer you stay climbing.
+// Add a timer, similar to the one on wall behind player check.
+// The energy is drained faster the longer you stay climbing.
+// Which means you need to spam energy button after a while.
+// ? If the wall normal shows that you are upside down, the energy
+// depletes faster? And vice versa? 
 
 // After mentoring with Martin:
 //
@@ -41,6 +42,7 @@
 //	 - Wall jumping
 //	 - Running up wall
 //	 - Side jump on wall
+//	 - Slide down wall 
 // - Jumping on pillars
 // - Remove magic numbers to a reasonable extent 
 // - Cinematic camera?

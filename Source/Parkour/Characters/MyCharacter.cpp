@@ -647,7 +647,7 @@ void AMyCharacter::FindClimbRotation()
 	if (bIsJumpingOutFromWall && CurrentClimbingWall == HitResultPlayerRotation.GetActor())
 		return;
 
-		// DrawDebugLine(World, StartTraces[i], EndTraces[i], FColor::Red, false, EDrawDebugTrace::ForOneFrame);
+	// DrawDebugLine(World, StartTraces[i], EndTraces[i], FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 	bIsJumpingOutFromWall = false;
 	CurrentClimbingWall = HitResultPlayerRotation.GetActor();
 	SetPlayerRotation(HitResultPlayerRotation.ImpactNormal.Rotation());
