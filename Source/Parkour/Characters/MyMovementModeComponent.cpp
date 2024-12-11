@@ -3,11 +3,8 @@
 
 #include "../Characters/MyMovementModeComponent.h"
 
-// Sets default values for this component's properties
 UMyMovementModeComponent::UMyMovementModeComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
@@ -59,20 +56,6 @@ void UMyMovementModeComponent::SetCurrentMovementMode(ECurrentMovementMode Movem
 	default:
 		CurrentMovementTexture = WalkingTexture;
 	}
-	UE_LOG(LogTemp, Log, TEXT("Movement mode: %d"), MovementMode.GetValue())
+	// UE_LOG(LogTemp, Log, TEXT("Movement mode: %d"), MovementMode.GetValue())
 	OnNewMovement.Broadcast();
 }
-
-// Called when the game starts
-void UMyMovementModeComponent::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
-
-// Called every frame
-void UMyMovementModeComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-}
-

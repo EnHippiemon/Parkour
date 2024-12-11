@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "../Input/MyPlayerInput.h"
+#include "Engine/DataAsset.h"
 #include "MyCharacter.generated.h"
 
 // Add climbing energy:
@@ -105,6 +106,10 @@
 // - When wall jumping, continually add velocity to not lose momentum.
 //   If landed or is climbing, the force stops.
 
+class UMySpringArmComponent;
+class UMyCameraComponent;
+class UMyMovementModeComponent;
+class UMyCharacterMovementDataAsset;
 
 // Needs to be UENUM if using Blueprints
 UENUM(BlueprintType)
@@ -135,10 +140,6 @@ enum EPlayerState
 // 	Ecmm_Exhausted
 // };
 
-class UMySpringArmComponent;
-class UMyCameraComponent;
-class UMyMovementModeComponent;
-
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPlayerState, NewState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCanJumpBackChanged, bool, CanJumpBack);
 
@@ -150,19 +151,22 @@ class PARKOUR_API AMyCharacter : public AMyPlayerInput
 public:	
 	AMyCharacter();
 
-	UFUNCTION(BlueprintCallable)
-	float GetMovementEnergy() { return MovementEnergy; }
-	
 	UPROPERTY(BlueprintAssignable)
 	FOnStateChanged OnStateChanged;
 	UPROPERTY(BlueprintAssignable)
 	FOnCanJumpBackChanged OnCanJumpBackChanged;
 	
-	FVector GetLocation() const { return GetActorLocation(); }
+	UFUNCTION(BlueprintCallable)
+	float GetMovementEnergy() { return MovementEnergy; }
 
 	float GetSlowMotionTimeDilation() const { return SlowMotionDilation; }
+	
+	FVector GetLocation() const { return GetActorLocation(); }
 
 	UMyMovementModeComponent* GetMovementModeComponent() { return MyMovementModeComponent; }
+
+
+protected:
 
 private:
 #pragma region ---------- VARIABLES -----------
@@ -303,6 +307,12 @@ private:
 		TEnumAsByte<EPlayerState> SavedState;
 		// Previous state, to check if it has been changed
 		TEnumAsByte<EPlayerState> PreviousState;
+	
+	/* Attachments */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
+	UMyMovementModeComponent* MyMovementModeComponent;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+	UMyCharacterMovementDataAsset* MyCharacterMovementDataAsset;
 
 #pragma endregion
 	
@@ -355,10 +365,6 @@ private:
 
 	/* Static functions */
 		static float FindSmallestFloat(TArray<float>);
-
-	/* Attachments */
-		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-		UMyMovementModeComponent* MyMovementModeComponent;
 
 	/* Inherited functions */
 		virtual void BeginPlay() override;

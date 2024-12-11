@@ -72,14 +72,5 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category=UI)
 	UTexture2D* ExhaustedTexture;
 #pragma endregion
-
-protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
-
-public:	
-	// Called every frame
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
-		
+	
 };

@@ -5,6 +5,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MyCameraComponent.h"
+#include "MyCharacterMovementDataAsset.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -12,6 +13,7 @@
 AMyCharacter::AMyCharacter()
 {
 	MyMovementModeComponent = CreateDefaultSubobject<UMyMovementModeComponent>("MovementModeComponent");
+	// MyCharacterMovementDataAsset->CreateDefaultSubobject<UMyCharacterMovementDataAsset>("MovementDataAsset");
 }
 
 void AMyCharacter::PlayerStateSwitch()
@@ -910,6 +912,9 @@ void AMyCharacter::BeginPlay()
 	Super::BeginPlay();
 
 	MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
+
+	if (!IsValid(MyCharacterMovementDataAsset))
+		UE_LOG(LogTemp, Error, TEXT("MyCharacter.cpp - No Data Asset selected!"))
 }
 
 void AMyCharacter::Tick(float const DeltaTime)
@@ -931,9 +936,4 @@ void AMyCharacter::Tick(float const DeltaTime)
 
 	// Keep last 
 	PlayerStateSwitch();
-
-	// UE_LOG(LogTemp, Warning, TEXT("Player velocity: %s"), *GetCharacterMovement()->Velocity.ToString())
-	// UE_LOG(LogTemp, Warning, TEXT("Saved state: %d"), SavedState.GetValue())
-	// UE_LOG(LogTemp, Warning, TEXT("Player state: %d"), CurrentState.GetValue())
-	// UE_LOG(LogTemp, Warning, TEXT("FoundWall: %hhd"), bHasReachedWallWhileSprinting)
 }
