@@ -106,10 +106,13 @@
 // - When wall jumping, continually add velocity to not lose momentum.
 //   If landed or is climbing, the force stops.
 
+class UHookshotDataAsset;
+class UClimbMovementDataAsset;
 class UMySpringArmComponent;
 class UMyCameraComponent;
 class UMyMovementModeComponent;
-class UMyCharacterMovementDataAsset;
+class UGroundMovementDataAsset;
+class UEnergyDataAsset;
 
 // Needs to be UENUM if using Blueprints
 UENUM(BlueprintType)
@@ -123,22 +126,6 @@ enum EPlayerState
 	Eps_UseHookshot,
 	Eps_Climbing
 };
-
-// enum ECurrentMovementMode
-// {
-// 	Ecmm_Idle,
-// 	Ecmm_Walking,
-// 	Ecmm_Sprinting,
-// 	Ecmm_Climbing,
-// 	Ecmm_LedgeClimbing,
-// 	Ecmm_Jumping,
-// 	Ecmm_ClimbJumping,
-// 	Ecmm_RunningUpWall,
-// 	Ecmm_WallJumping,
-// 	Ecmm_Aiming,
-// 	Ecmm_LeavingAim,
-// 	Ecmm_Exhausted
-// };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPlayerState, NewState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCanJumpBackChanged, bool, CanJumpBack);
@@ -165,67 +152,26 @@ public:
 
 	UMyMovementModeComponent* GetMovementModeComponent() { return MyMovementModeComponent; }
 
-
-protected:
-
 private:
 #pragma region ---------- VARIABLES -----------
-
+	
+	/* Time dilation */
+		UPROPERTY(EditDefaultsOnly, Category=TimeDilation)
+		float SlowMotionDilation = 0.05f;
+		
 	/* Hookshot */ 
-		// Higher is slower
-		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-		float HookshotSpeed = 1000.f;
-		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-		float HookLength = 1200.f;
-		UPROPERTY(EditDefaultsOnly, Category=Hookshot)
-		TEnumAsByte<ECollisionChannel> HookCollision;
-
 		bool bIsUsingHookshot = false;
 		FVector TargetLocation;
 
 	/* Character Movement */
 		/* Speed */
-			UPROPERTY(EditDefaultsOnly, Category=MovementSpeed)
-			float ReachTargetUpSpeed = 1.f;
-			UPROPERTY(EditDefaultsOnly, Category=MovementSpeed)
-			float ReachTargetDownSpeed = 3.f;
-			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-			float MaxWalkSpeed = 600.f;
-			UPROPERTY(EditDefaultsOnly, Category="Sprinting|Slowing Down")
-			float ThresholdToStopOverTime = 450.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-			float StandardRotationRate = 500.f;
-			UPROPERTY(EditDefaultsOnly, Category="Camera|CameraPositionSpeed")
-			float AimRotationRate = 30000.f;
-
 			float TargetMovementSpeed = 600.f;
 			bool bShouldStopMovementOverTime = false;
 	
 		/* Jumping */
-			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float RegularJumpForce = 100000.f;
-			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float WallJumpUpVelocity = 1000.f;
-			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float WallJumpBackVelocity = 1000.f;
-			UPROPERTY(EditDefaultsOnly, Category=Jump)
-			float ThresholdToJumpBack = 0.77f;
-
 			bool bWallIsInFront = false;
 
 		/* Energy */
-			UPROPERTY(EditDefaultsOnly, Category=Energy)
-			float AimEnergyDepletionSpeed = 7.5f;
-			UPROPERTY(EditDefaultsOnly, Category=Energy)
-			TEnumAsByte<ECollisionChannel> BlockAllCollision;
-			UPROPERTY(EditDefaultsOnly, Category=Energy)
-			float ExhaustionSpeed = 0.5f;
-			UPROPERTY(EditDefaultsOnly, Category=Energy)
-			float EnergyRegainSpeed = 0.4f;
-			// The length the floor trace must be before losing energy
-			UPROPERTY(EditDefaultsOnly, Category=Energy)
-			float FloorAngleThreshold = 0.6f;
-			
 			float MovementEnergy = 1.00f;
 			float MovementSpeedPercent = 1.00f;
 			float FloorAngle = 1.00f;
@@ -233,56 +179,17 @@ private:
 			bool bCanGainEnergy = true;
 
 		/* Climbing */
-			UPROPERTY(EditDefaultsOnly, Category=Climbing)
-			TEnumAsByte<ECollisionChannel> ClimbingCollision;
-			// Distance to check wall surface normal for rotation correction
-			UPROPERTY(EditDefaultsOnly, Category=Climbing)
-			float PlayerToWallDistance = 15.f;
-			UPROPERTY(EditDefaultsOnly, Category=Climbing)
-			float ClimbingWidth = 40.f;
-
 			/* Climb jump */// Impulse or velocity? 
-				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-				float ClimbJumpingTime = 0.5f;
-				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-				float ClimbJumpOutImpulseUp = 55000.f;
-				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-				float ClimbJumpOutImpulseBack = 60000.f;
-				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-				float VelocityClimbJumpOutUp = 550.f;
-				UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-				float VelocityClimbJumpOutBack = 600.f;
-		
 				float CantClimbTimer = 0.f;
 				bool bIsJumpingOutFromWall;
 				UPROPERTY()
 				AActor* CurrentClimbingWall;
 
 			/* Ledge climbing */
-				UPROPERTY (EditDefaultsOnly, Category="Climbing|Ledge")
-				float BottomLedgeDetectionZOffset = 70.f;
-				UPROPERTY (EditDefaultsOnly, Category="Climbing|Ledge")
-				FVector LedgeClimbDetectionOffset = FVector(50.f, 0.f, 100.f);
-				UPROPERTY(EditDefaultsOnly, Category="Climbing|Ledge")
-				float LedgeClimbDuration = 1.f;
-				UPROPERTY(EditDefaultsOnly, Category="Climbing|Ledge")
-				TEnumAsByte<ECollisionChannel> LedgeChannel;
-
 				FVector LedgeClimbDestination; 
 				bool bIsClimbingLedge = false;
 	
 		/* Sprinting */
-			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-			TEnumAsByte<ETraceTypeQuery> ObstacleTraceType;
-			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-			float DistanceBeforeAbleToRunUpWall = 300.f;
-			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-			float RunningUpWallTimeInSeconds = 20.f;
-			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-			float DistanceToRunUpWall = 200.f;
-			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
-			float MaxSprintSpeed = 1000.f;
-		
 			FTimerHandle TimerRunningUpWall;
 			FVector RunningUpWallEndLocation;
 			UPROPERTY()
@@ -291,14 +198,7 @@ private:
 			bool bHasReachedWallWhileSprinting = false;
 
 		/* Idle */
-			UPROPERTY(EditDefaultsOnly, Category=Idle)
-			float TimeBeforeIdle = 15.f;
-
 			float TimeSinceMoved = 0.f;
-
-	/* Time dilation */
-		UPROPERTY(EditDefaultsOnly, Category=TimeDilation)
-		float SlowMotionDilation = 0.05f;
 	
 	/* Player States */ 
 		// Needs to be UPROPERTY if using Blueprints 
@@ -309,10 +209,17 @@ private:
 		TEnumAsByte<EPlayerState> PreviousState;
 	
 	/* Attachments */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
-	UMyMovementModeComponent* MyMovementModeComponent;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-	UMyCharacterMovementDataAsset* MyCharacterMovementDataAsset;
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
+		UMyMovementModeComponent* MyMovementModeComponent;
+
+		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UGroundMovementDataAsset* GroundMovementData;
+		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UEnergyDataAsset* EnergyData;
+		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UClimbMovementDataAsset* ClimbData;
+		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UHookshotDataAsset* HookshotData;
 
 #pragma endregion
 	
