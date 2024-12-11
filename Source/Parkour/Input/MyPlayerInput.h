@@ -8,6 +8,7 @@
 class UMySpringArmComponent;
 class UMyCameraComponent;
 class USceneComponent;
+class UMyMovementModeComponent;
 
 UCLASS()
 class PARKOUR_API AMyPlayerInput : public ACharacter

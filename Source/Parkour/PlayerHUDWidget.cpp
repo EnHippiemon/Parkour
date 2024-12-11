@@ -1,6 +1,7 @@
 #include "PlayerHUDWidget.h"
 
 #include "Characters/MyCharacter.h"
+#include "Characters/MyMovementModeComponent.h"
 #include "Components/Image.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -10,8 +11,11 @@ void UPlayerHUDWidget::NativeConstruct()
 	
 	Player = Cast<AMyCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 
-	if (Player)
-		Player->OnNewMovement.AddUniqueDynamic(this, &UPlayerHUDWidget::UpdateMovementImage);
+	if (IsValid(Player))
+	{
+		if (IsValid(Player->GetMovementModeComponent()))
+			Player->GetMovementModeComponent()->OnNewMovement.AddUniqueDynamic(this, &UPlayerHUDWidget::UpdateMovementImage);
+	}
 }
 
 float UPlayerHUDWidget::CalculateEnergyPercentage()
@@ -24,5 +28,5 @@ float UPlayerHUDWidget::CalculateEnergyPercentage()
 
 void UPlayerHUDWidget::UpdateMovementImage()
 {
-	MovementImage->SetBrushFromTexture(Player->GetCurrentMovementTexture(), true);
+	MovementImage->SetBrushFromTexture(Player->GetMovementModeComponent()->GetCurrentMovementTexture(), true);
 }

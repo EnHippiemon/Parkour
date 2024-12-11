@@ -1,6 +1,7 @@
 #include "MyCharacter.h"
 
 #include "MySpringArmComponent.h"
+#include "MyMovementModeComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MyCameraComponent.h"
@@ -10,6 +11,7 @@
 
 AMyCharacter::AMyCharacter()
 {
+	MyMovementModeComponent = CreateDefaultSubobject<UMyMovementModeComponent>("MovementModeComponent");
 }
 
 void AMyCharacter::PlayerStateSwitch()
@@ -23,21 +25,21 @@ void AMyCharacter::PlayerStateSwitch()
 			GetCharacterMovement()->SetWalkableFloorAngle(50.f);
 			GetCharacterMovement()->bOrientRotationToMovement = true;
 			if (!bIsExhausted)
-				SetCurrentMovementMode(Ecmm_Walking);
+				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
 			break;
 		case Eps_Sprinting:
 			GetCharacterMovement()->SetWalkableFloorAngle(90.f);
-			SetCurrentMovementMode(Ecmm_Sprinting);
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Sprinting);
 			break;
 		case Eps_Idle:
-			SetCurrentMovementMode(Ecmm_Idle);
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Idle);
 			break;
 		case Eps_Aiming:
 			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), SlowMotionDilation);
 			GetCharacterMovement()->bOrientRotationToMovement = false;
 			GetCharacterMovement()->bUseControllerDesiredRotation = true;
 			GetCharacterMovement()->RotationRate = FRotator(0.f, AimRotationRate, 0.f);
-			SetCurrentMovementMode(Ecmm_Aiming);
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Aiming);
 			break;
 		case Eps_LeaveAiming:
 			GetCharacterMovement()->RotationRate = FRotator(0.f, StandardRotationRate, 0.f);
@@ -45,12 +47,12 @@ void AMyCharacter::PlayerStateSwitch()
 			GetCharacterMovement()->bUseControllerDesiredRotation = false;
 			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
 			if (bIsUsingHookshot)
-				SetCurrentMovementMode(Ecmm_LeavingAim);
+				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_LeavingAim);
 			break;
 		case Eps_Climbing:
 			GetCharacterMovement()->MovementMode = MOVE_Flying;
 			GetCharacterMovement()->bOrientRotationToMovement = false;
-			SetCurrentMovementMode(Ecmm_Climbing);
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Climbing);
 			break;
 		default:
 			UE_LOG(LogTemp, Error, TEXT("No active Player State. Now Walking"))
@@ -165,57 +167,57 @@ void AMyCharacter::SetPlayerVelocity(const FVector& Value) const
 	GetCharacterMovement()->Velocity = Value;
 }
 
-void AMyCharacter::SetCurrentMovementMode(ECurrentMovementMode Movement)
-{
-	if (MovementMode == Movement)
-		return;
-	
-	MovementMode = Movement;
-
-	switch (MovementMode)
-	{
-	case Ecmm_Idle:
-		CurrentMovementTexture = IdleTexture;
-		break;
-	case Ecmm_Walking:
-		CurrentMovementTexture = WalkingTexture;
-		break;
-	case Ecmm_Sprinting:
-		CurrentMovementTexture = RunningTexture;
-		break;
-	case Ecmm_Climbing:
-		CurrentMovementTexture = ClimbingTexture;
-		break;
-	case Ecmm_LedgeClimbing:
-		CurrentMovementTexture = LedgeClimbingTexture;
-		break;
-	case Ecmm_Jumping:
-		CurrentMovementTexture = JumpTexture;
-		break;
-	case Ecmm_ClimbJumping:
-		CurrentMovementTexture = ClimbJumpTexture;
-		break;
-	case Ecmm_RunningUpWall:
-		CurrentMovementTexture = RunUpWallTexture;
-		break;
-	case Ecmm_WallJumping:
-		CurrentMovementTexture = WallJumpTexture;
-		break;
-	case Ecmm_Aiming:
-		CurrentMovementTexture = AimingTexture;
-		break;
-	case Ecmm_LeavingAim:
-		CurrentMovementTexture = LeaveAimingTexture;
-		break;
-	case Ecmm_Exhausted:
-		CurrentMovementTexture = ExhaustedTexture;
-		break;
-	default:
-		CurrentMovementTexture = WalkingTexture;
-	}
-	UE_LOG(LogTemp, Log, TEXT("Movement mode: %d"), MovementMode.GetValue())
-	OnNewMovement.Broadcast();
-}
+// void AMyCharacter::SetCurrentMovementMode(ECurrentMovementMode Movement)
+// {
+// 	if (MovementMode == Movement)
+// 		return;
+// 	
+// 	MovementMode = Movement;
+//
+// 	switch (MovementMode)
+// 	{
+// 	case Ecmm_Idle:
+// 		CurrentMovementTexture = IdleTexture;
+// 		break;
+// 	case Ecmm_Walking:
+// 		CurrentMovementTexture = WalkingTexture;
+// 		break;
+// 	case Ecmm_Sprinting:
+// 		CurrentMovementTexture = RunningTexture;
+// 		break;
+// 	case Ecmm_Climbing:
+// 		CurrentMovementTexture = ClimbingTexture;
+// 		break;
+// 	case Ecmm_LedgeClimbing:
+// 		CurrentMovementTexture = LedgeClimbingTexture;
+// 		break;
+// 	case Ecmm_Jumping:
+// 		CurrentMovementTexture = JumpTexture;
+// 		break;
+// 	case Ecmm_ClimbJumping:
+// 		CurrentMovementTexture = ClimbJumpTexture;
+// 		break;
+// 	case Ecmm_RunningUpWall:
+// 		CurrentMovementTexture = RunUpWallTexture;
+// 		break;
+// 	case Ecmm_WallJumping:
+// 		CurrentMovementTexture = WallJumpTexture;
+// 		break;
+// 	case Ecmm_Aiming:
+// 		CurrentMovementTexture = AimingTexture;
+// 		break;
+// 	case Ecmm_LeavingAim:
+// 		CurrentMovementTexture = LeaveAimingTexture;
+// 		break;
+// 	case Ecmm_Exhausted:
+// 		CurrentMovementTexture = ExhaustedTexture;
+// 		break;
+// 	default:
+// 		CurrentMovementTexture = WalkingTexture;
+// 	}
+// 	UE_LOG(LogTemp, Log, TEXT("Movement mode: %d"), MovementMode.GetValue())
+// 	OnNewMovement.Broadcast();
+// }
 
 void AMyCharacter::CheckFloorAngle()
 {
@@ -285,13 +287,13 @@ void AMyCharacter::CheckExhaustion()
 	
 	if (MovementEnergy >= 1.f && bIsExhausted)
 	{
-		SetCurrentMovementMode(Ecmm_Walking);
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
 		bIsExhausted = false;
 	}
 	
 	if (MovementEnergy <= 0.f && !bIsExhausted)
 	{
-		SetCurrentMovementMode(Ecmm_Exhausted);
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Exhausted);
 		bIsExhausted = true;
 		CurrentState = CurrentState == Eps_Aiming ? Eps_LeaveAiming : Eps_Walking;
 	}
@@ -362,7 +364,7 @@ void AMyCharacter::HandleJumpInput()
 		SetPlayerVelocity(FVector(0.f, 0.f, WallJumpUpVelocity) - GetActorForwardVector() * WallJumpBackVelocity);
 		SetActorRotation(FRotator(0, GetActorRotation().Yaw + 180, 0));
 		bHasReachedWallWhileSprinting = false;
-		SetCurrentMovementMode(Ecmm_WallJumping);
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_WallJumping);
 		return;
 	}
 
@@ -378,13 +380,13 @@ void AMyCharacter::HandleJumpInput()
 		{
 			constexpr int RotationCorrection = 180;
 			bIsJumpingOutFromWall = true;
-			SetCurrentMovementMode(Ecmm_WallJumping);
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_WallJumping);
 			SetPlayerVelocity(FVector(0.f, 0.f, VelocityClimbJumpOutUp) - GetActorForwardVector() * VelocityClimbJumpOutBack);
 			SetActorRotation(FRotator(0, GetActorRotation().Yaw + RotationCorrection, 0));
 			return;
 		}
 
-		SetCurrentMovementMode(Ecmm_ClimbJumping);
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_ClimbJumping);
 		
 		// Jump in direction of movement input 
 		SetPlayerVelocity(CharacterMovement * WallJumpUpVelocity);
@@ -404,7 +406,7 @@ void AMyCharacter::HandleJumpInput()
 	
 	if (GetCanJumpBackwards() && !TraceDown)
 	{
-		SetCurrentMovementMode(Ecmm_WallJumping);
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_WallJumping);
 
 		if (GetCharacterMovement()->IsMovingOnGround())
 		{
@@ -423,7 +425,7 @@ void AMyCharacter::HandleJumpInput()
 
 	if (GetCharacterMovement()->IsMovingOnGround())
 	{
-		SetCurrentMovementMode(Ecmm_Jumping);
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Jumping);
 		MovementEnergy -= 0.3f;
 		GetCharacterMovement()->AddImpulse(FVector(0, 0, RegularJumpForce));
 	}
@@ -434,7 +436,7 @@ void AMyCharacter::Landed(const FHitResult& Hit)
 	Super::Super::Landed(Hit);
 
 	if (!bIsExhausted)
-		SetCurrentMovementMode(CurrentState == Eps_Sprinting ? Ecmm_Sprinting : Ecmm_Walking);
+		MyMovementModeComponent->SetCurrentMovementMode(CurrentState == Eps_Sprinting ? Ecmm_Sprinting : Ecmm_Walking);
 	
 	bHasReachedWallWhileSprinting = false;
 }
@@ -582,7 +584,7 @@ void AMyCharacter::FindClimbableWall()
 		else
 		{
 			CurrentState = Eps_Climbing;
-			SetCurrentMovementMode(Ecmm_Climbing);
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Climbing);
 			GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
 			FindClimbRotation();
 		}
@@ -704,7 +706,7 @@ void AMyCharacter::LookForLedge()
 	{
 		LedgeClimbDestination = HighTraceEnd + FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 		bIsClimbingLedge = true;
-		SetCurrentMovementMode(Ecmm_LedgeClimbing);
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_LedgeClimbing);
 		
 		UKismetSystemLibrary::MoveComponentTo(
 			RootComponent,
@@ -877,7 +879,7 @@ void AMyCharacter::RunUpToWall()
 		{
 			bHasReachedWallWhileSprinting = true;
 			bIsNearingWall = false;
-			SetCurrentMovementMode(Ecmm_RunningUpWall);
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_RunningUpWall);
 			UKismetSystemLibrary::MoveComponentTo(
 				RootComponent,
 				RunningUpWallEndLocation,
@@ -907,7 +909,7 @@ void AMyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	SetCurrentMovementMode(Ecmm_Walking);
+	MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
 }
 
 void AMyCharacter::Tick(float const DeltaTime)

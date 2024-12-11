@@ -106,7 +106,6 @@
 //   If landed or is climbing, the force stops.
 
 
-class UMyCameraComponent;
 // Needs to be UENUM if using Blueprints
 UENUM(BlueprintType)
 enum EPlayerState
@@ -120,25 +119,26 @@ enum EPlayerState
 	Eps_Climbing
 };
 
-enum ECurrentMovementMode
-{
-	Ecmm_Idle,
-	Ecmm_Walking,
-	Ecmm_Sprinting,
-	Ecmm_Climbing,
-	Ecmm_LedgeClimbing,
-	Ecmm_Jumping,
-	Ecmm_ClimbJumping,
-	Ecmm_RunningUpWall,
-	Ecmm_WallJumping,
-	Ecmm_Aiming,
-	Ecmm_LeavingAim,
-	Ecmm_Exhausted
-};
+// enum ECurrentMovementMode
+// {
+// 	Ecmm_Idle,
+// 	Ecmm_Walking,
+// 	Ecmm_Sprinting,
+// 	Ecmm_Climbing,
+// 	Ecmm_LedgeClimbing,
+// 	Ecmm_Jumping,
+// 	Ecmm_ClimbJumping,
+// 	Ecmm_RunningUpWall,
+// 	Ecmm_WallJumping,
+// 	Ecmm_Aiming,
+// 	Ecmm_LeavingAim,
+// 	Ecmm_Exhausted
+// };
 
 class UMySpringArmComponent;
+class UMyCameraComponent;
+class UMyMovementModeComponent;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNewMovement);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPlayerState, NewState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCanJumpBackChanged, bool, CanJumpBack);
 
@@ -152,19 +152,17 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	float GetMovementEnergy() { return MovementEnergy; }
-
-	UPROPERTY(BlueprintAssignable)
-	FOnNewMovement OnNewMovement;
+	
 	UPROPERTY(BlueprintAssignable)
 	FOnStateChanged OnStateChanged;
 	UPROPERTY(BlueprintAssignable)
 	FOnCanJumpBackChanged OnCanJumpBackChanged;
-
-	UTexture2D* GetCurrentMovementTexture() { return CurrentMovementTexture; }
 	
 	FVector GetLocation() const { return GetActorLocation(); }
 
 	float GetSlowMotionTimeDilation() const { return SlowMotionDilation; }
+
+	UMyMovementModeComponent* GetMovementModeComponent() { return MyMovementModeComponent; }
 
 private:
 #pragma region ---------- VARIABLES -----------
@@ -305,37 +303,7 @@ private:
 		TEnumAsByte<EPlayerState> SavedState;
 		// Previous state, to check if it has been changed
 		TEnumAsByte<EPlayerState> PreviousState;
-		// Movement mode, checks all types of movement and is used for anims etc
-		TEnumAsByte<ECurrentMovementMode> MovementMode;
 
-#pragma region --- UI ---
-		UPROPERTY()
-		UTexture2D* CurrentMovementTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* IdleTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* WalkingTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* RunningTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* ClimbingTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* LedgeClimbingTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* RunUpWallTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* ClimbJumpTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* WallJumpTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* JumpTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* AimingTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* LeaveAimingTexture;
-		UPROPERTY(EditDefaultsOnly, Category=UI)
-		UTexture2D* ExhaustedTexture;
-#pragma endregion
 #pragma endregion
 	
 #pragma region ---------- FUNCTIONS -----------
@@ -346,7 +314,6 @@ private:
 		/* Basic character movement */
 			void MovementOutput();
 			void SetPlayerVelocity(const FVector& Value) const;
-			void SetCurrentMovementMode(ECurrentMovementMode Movement);
 
 		/* Speed changes */
 			void CheckFloorAngle();
@@ -388,6 +355,10 @@ private:
 
 	/* Static functions */
 		static float FindSmallestFloat(TArray<float>);
+
+	/* Attachments */
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		UMyMovementModeComponent* MyMovementModeComponent;
 
 	/* Inherited functions */
 		virtual void BeginPlay() override;
