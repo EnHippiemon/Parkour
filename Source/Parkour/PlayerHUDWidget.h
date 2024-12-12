@@ -7,7 +7,6 @@
 class UImage;
 class FCanvasItem;
 class AMyCharacter;
-// class UCanvas;
 
 UCLASS()
 class PARKOUR_API UPlayerHUDWidget : public UUserWidget
@@ -31,6 +30,4 @@ private:
 
 	UPROPERTY(EditDefaultsOnly)
 	FVector2D ImageOffset = FVector2D(-10, 0);
-
-	
 };

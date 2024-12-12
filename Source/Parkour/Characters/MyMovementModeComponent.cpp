@@ -53,9 +53,11 @@ void UMyMovementModeComponent::SetCurrentMovementMode(ECurrentMovementMode Movem
 	case Ecmm_Exhausted:
 		CurrentMovementTexture = ExhaustedTexture;
 		break;
+	case Ecmm_SlidingDown:
+		CurrentMovementTexture = SlidingDownTexture;
+		break;
 	default:
 		CurrentMovementTexture = WalkingTexture;
 	}
-	// UE_LOG(LogTemp, Log, TEXT("Movement mode: %d"), MovementMode.GetValue())
 	OnNewMovement.Broadcast();
 }

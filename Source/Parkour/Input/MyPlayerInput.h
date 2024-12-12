@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-// #include "Parkour/Characters/MyCameraComponent.h"
 #include "MyPlayerInput.generated.h"
 
 class UMySpringArmComponent;

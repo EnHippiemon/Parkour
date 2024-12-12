@@ -188,6 +188,9 @@ private:
 			/* Ledge climbing */
 				FVector LedgeClimbDestination; 
 				bool bIsClimbingLedge = false;
+
+			/* Sliding */
+				bool bIsSlidingDown = false;
 	
 		/* Sprinting */
 			FTimerHandle TimerRunningUpWall;
@@ -212,14 +215,15 @@ private:
 		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
 		UMyMovementModeComponent* MyMovementModeComponent;
 
-		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-		UGroundMovementDataAsset* GroundMovementData;
-		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-		UEnergyDataAsset* EnergyData;
-		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-		UClimbMovementDataAsset* ClimbData;
-		UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-		UHookshotDataAsset* HookshotData;
+		/* Data assets */
+			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			UGroundMovementDataAsset* GroundMovementData;
+			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			UEnergyDataAsset* EnergyData;
+			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			UClimbMovementDataAsset* ClimbData;
+			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			UHookshotDataAsset* HookshotData;
 
 #pragma endregion
 	
@@ -241,6 +245,7 @@ private:
 			void StopMovementOverTime();
 			void CheckShouldStopMovementOverTime();
 			void CheckIfWallIsInFront();
+			void SetTimeDilation();
 
 		/* Jumping */
 			virtual void HandleJumpInput() override;
@@ -256,6 +261,9 @@ private:
 
 			/* Ledge climbing */
 				void LookForLedge();
+
+			/* Sliding */
+				void DecideIfShouldSlide();
 
 		/* Running */ 
 			void RunUpToWall();

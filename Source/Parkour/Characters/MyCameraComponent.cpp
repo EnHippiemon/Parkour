@@ -2,6 +2,8 @@
 
 
 #include "../Characters/MyCameraComponent.h"
+
+#include "DataAssets/CameraDataAsset.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -13,6 +15,10 @@ UMyCameraComponent::UMyCameraComponent()
 	PrimaryComponentTick.bStartWithTickEnabled = true;
 
 	bUsePawnControlRotation = false;
+
+	static ConstructorHelpers::FObjectFinder<UCameraDataAsset> CameraDataAsset(TEXT("/Game/Player/DataAssets/CameraDataAsset"));
+	if (CameraDataAsset.Object)
+		CameraData = CameraDataAsset.Object;
 }
 
 void UMyCameraComponent::StateSwitch(EPlayerState State)
@@ -26,30 +32,30 @@ void UMyCameraComponent::TickStateSwitch()
 	{
 	case Eps_Walking:
 		FieldOfView = Player->GetCharacterMovement()->Velocity.Length() == 0
-		? FieldOfView = FMath::Lerp(FieldOfView, StillFOV, StillFOVSpeed)
-		: FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, WalkingFOVSpeed);
+		? FieldOfView = FMath::Lerp(FieldOfView, CameraData->StillFOV, CameraData->StillFOVSpeed)
+		: FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->WalkingFOVSpeed);
 		break;
 	case Eps_Sprinting:
-		FieldOfView = FMath::Lerp(FieldOfView, SprintingFOV, SprintFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->SprintingFOV, CameraData->SprintFOVSpeed);
 		break;
 	case Eps_Idle:
-		FieldOfView = FMath::Lerp(FieldOfView, IdleFOV, IdleFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->IdleFOV, CameraData->IdleFOVSpeed);
 		break;
 	case Eps_Aiming:
-		FieldOfView = FMath::Lerp(FieldOfView, AimingFOV, AimingFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->AimingFOV, CameraData->AimingFOVSpeed);
 		break;
 	case Eps_LeaveAiming:
-		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, WalkingFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->WalkingFOVSpeed);
 		break;
 	case Eps_Climbing:
-		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, ClimbingFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->ClimbingFOVSpeed);
 		break;
 	default:
 		break;
 	}
 	
 	if (CurrentState != Eps_Idle)
-		FieldOfView = FMath::Lerp(FieldOfView, WalkingFOV, 0.001f);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, 0.001f);
 }
 
 void UMyCameraComponent::BeginPlay()
@@ -58,9 +64,10 @@ void UMyCameraComponent::BeginPlay()
 
 	Player = Cast<AMyCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 	if (IsValid(Player))
-	{
 		Player->OnStateChanged.AddUniqueDynamic(this, &UMyCameraComponent::StateSwitch);
-	}
+
+	if (!CameraData)
+		UE_LOG(LogTemp, Error, TEXT("MyCameraComponent.cpp - Data asset missing!"));
 }
 
 void UMyCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType,

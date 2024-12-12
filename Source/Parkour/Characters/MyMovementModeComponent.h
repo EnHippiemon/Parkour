@@ -19,7 +19,8 @@ enum ECurrentMovementMode
 	Ecmm_WallJumping,
 	Ecmm_Aiming,
 	Ecmm_LeavingAim,
-	Ecmm_Exhausted
+	Ecmm_Exhausted,
+	Ecmm_SlidingDown
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNewMovement);
@@ -71,6 +72,7 @@ private:
 	UTexture2D* LeaveAimingTexture;
 	UPROPERTY(EditDefaultsOnly, Category=UI)
 	UTexture2D* ExhaustedTexture;
+	UPROPERTY(EditDefaultsOnly, Category=UI)
+	UTexture2D* SlidingDownTexture;
 #pragma endregion
-	
 };

@@ -37,6 +37,10 @@ public:
 			UPROPERTY(EditDefaultsOnly, Category=Jump)
 			float ThresholdToJumpBack = 0.77f;
 
+		/* Falling */
+			UPROPERTY(EditDefaultsOnly, Category=Falling)
+			float GravityScale = 2.f;
+
 		/* Sprinting */
 			UPROPERTY(EditDefaultsOnly, Category=Sprinting)
 			TEnumAsByte<ETraceTypeQuery> ObstacleTraceType;

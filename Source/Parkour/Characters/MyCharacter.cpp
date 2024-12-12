@@ -17,18 +17,16 @@ AMyCharacter::AMyCharacter()
 {
 	MyMovementModeComponent = CreateDefaultSubobject<UMyMovementModeComponent>("MovementModeComponent");
 
+	// Hard setting the data assets 
 	static ConstructorHelpers::FObjectFinder<UGroundMovementDataAsset> GroundMovement(TEXT("/Game/Player/DataAssets/GroundMovementDataAsset"));
 	if (GroundMovement.Object)
 		GroundMovementData = GroundMovement.Object;
-	
 	static ConstructorHelpers::FObjectFinder<UEnergyDataAsset> Energy(TEXT("/Game/Player/DataAssets/EnergyDataAsset"));
 	if (Energy.Object)
 		EnergyData = Energy.Object;
-	
 	static ConstructorHelpers::FObjectFinder<UClimbMovementDataAsset> ClimbMovement(TEXT("/Game/Player/DataAssets/ClimbMovementDataAsset"));
 	if (ClimbMovement.Object)
 		ClimbData = ClimbMovement.Object;
-	
 	static ConstructorHelpers::FObjectFinder<UHookshotDataAsset> Hookshot(TEXT("/Game/Player/DataAssets/HookshotDataAsset"));
 	if (Hookshot.Object)
 		HookshotData = Hookshot.Object;
@@ -44,12 +42,13 @@ void AMyCharacter::PlayerStateSwitch()
 		case Eps_Walking:
 			GetCharacterMovement()->SetWalkableFloorAngle(50.f);
 			GetCharacterMovement()->bOrientRotationToMovement = true;
-			if (!bIsExhausted)
+			if (!bIsExhausted && !GetIsMidAir())
 				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
 			break;
 		case Eps_Sprinting:
 			GetCharacterMovement()->SetWalkableFloorAngle(90.f);
-			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Sprinting);
+			if (!GetIsMidAir())
+				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Sprinting);
 			break;
 		case Eps_Idle:
 			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Idle);
@@ -78,20 +77,18 @@ void AMyCharacter::PlayerStateSwitch()
 			UE_LOG(LogTemp, Error, TEXT("No active Player State. Now Walking"))
 		}
 		OnStateChanged.Broadcast(CurrentState);
+		PreviousState = CurrentState;
 	}
 	// Move this up one line 
-	PreviousState = CurrentState;
 
 	// Checks state every tick  
 	switch (CurrentState)
 	{
 	case Eps_Walking:
-		CheckFloorAngle();
 		CheckIdleness();
 		TargetMovementSpeed = GroundMovementData->MaxWalkSpeed * MovementSpeedPercent * MovementEnergy;
 		break;
 	case Eps_Sprinting:
-		CheckFloorAngle();
 		TargetMovementSpeed = GroundMovementData->MaxSprintSpeed * MovementSpeedPercent * MovementEnergy;
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
@@ -109,6 +106,8 @@ void AMyCharacter::PlayerStateSwitch()
 		break;		
 	case Eps_Aiming:
 		MovementEnergy -= GetWorld()->DeltaTimeSeconds * EnergyData->AimEnergyDepletionSpeed;
+		if (!GetIsMidAir())
+			HandleSecondaryActionStop();
 		break;
 	case Eps_LeaveAiming:
 		if (bIsUsingHookshot && (GetActorLocation() - TargetLocation).Length() < 10.f)
@@ -234,18 +233,25 @@ void AMyCharacter::CheckFloorAngle()
 	
 	// Get the shortest trace. Divide by 100 to make it 0-1. 
 	FloorAngle = FindSmallestFloat(TraceDistances) * 0.01f;
+}
 
+void AMyCharacter::DecideIfShouldSlide()
+{
 	// Decide if the player should slide down a wall 
-	if (FloorAngle < GroundMovementData->ThresholdToJumpBack && GetCharacterMovement()->Velocity.Z < 0.f && !bIsExhausted && CurrentState != Eps_Climbing)
+	if (FloorAngle < GroundMovementData->ThresholdToJumpBack && GetCharacterMovement()->Velocity.Z < 0.f &&
+		!bIsExhausted && CurrentState != Eps_Climbing && !bHasReachedWallWhileSprinting)
 	{
 		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
 		GetCharacterMovement()->GravityScale = 0.f;
-		GetCharacterMovement()->JumpZVelocity = 0;
+		bIsSlidingDown = true;
+		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_SlidingDown);
 	}
 	else
 	{
-		GetCharacterMovement()->GravityScale = 2.f;
-		GetCharacterMovement()->JumpZVelocity = 763;
+		GetCharacterMovement()->GravityScale = GroundMovementData->GravityScale;
+		bIsSlidingDown = false;
+		if (GetCharacterMovement()->Velocity.Z < 0.f && CurrentState != Eps_Aiming)
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Jumping);
 	}
 }
 
@@ -411,7 +417,7 @@ void AMyCharacter::Landed(const FHitResult& Hit)
 
 void AMyCharacter::HandleSprintInput()
 {
-	if (CurrentState != Eps_Walking || bIsExhausted || GetCharacterMovement()->Velocity.Length() < 0.1f)
+	if (CurrentState != Eps_Walking || bIsExhausted || GetCharacterMovement()->Velocity.Length() < 0.1f || bIsSlidingDown)
 		return;
 	
 	CurrentState = Eps_Sprinting;
@@ -494,6 +500,12 @@ void AMyCharacter::CheckIfWallIsInFront()
 
 	bWallIsInFront = FloorAngle > GroundMovementData->ThresholdToJumpBack;
 	OnCanJumpBackChanged.Broadcast(bWallIsInFront);
+}
+
+void AMyCharacter::SetTimeDilation()
+{
+	if (!GetIsMidAir() && UGameplayStatics::GetGlobalTimeDilation(GetWorld()) < 1)
+		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1);
 }
 
 bool AMyCharacter::GetCanJumpBackwards() const
@@ -896,6 +908,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	CheckExhaustion();
 	FindClimbableWall();
 	LookForLedge();
+	DecideIfShouldSlide();
 	
 	/* Running */
 	RunUpToWall();
