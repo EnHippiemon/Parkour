@@ -16,8 +16,6 @@ public:
 		UPROPERTY(EditDefaultsOnly, Category=Energy)
 		float AimEnergyDepletionSpeed = 5.f;
 		UPROPERTY(EditDefaultsOnly, Category=Energy)
-		TEnumAsByte<ECollisionChannel> BlockAllCollision;
-		UPROPERTY(EditDefaultsOnly, Category=Energy)
 		float ExhaustionSpeed = 0.7f;
 		UPROPERTY(EditDefaultsOnly, Category=Energy)
 		float EnergyRegainSpeed = 0.4f;

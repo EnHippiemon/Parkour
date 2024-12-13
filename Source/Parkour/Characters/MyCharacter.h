@@ -1,8 +1,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MyMovementModeComponent.h"
 #include "../Input/MyPlayerInput.h"
 #include "Engine/DataAsset.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "MyCharacter.generated.h"
 
 // Add climbing energy:
@@ -106,13 +108,20 @@
 // - When wall jumping, continually add velocity to not lose momentum.
 //   If landed or is climbing, the force stops.
 
-class UHookshotDataAsset;
-class UClimbMovementDataAsset;
-class UMySpringArmComponent;
-class UMyCameraComponent;
-class UMyMovementModeComponent;
-class UGroundMovementDataAsset;
-class UEnergyDataAsset;
+enum ECurrentAnimation : int;
+/* Forward Declaration */
+	/* Data Assets */
+	class UHookshotDataAsset;
+	// class UClimbMovementDataAsset;
+	class UGroundMovementDataAsset;
+	class UEnergyDataAsset;
+	class UJumpDataAsset;
+
+	/* Components */
+	class UMySpringArmComponent;
+	class UMyCameraComponent;
+	class UMyMovementModeComponent;
+	class UMyClimbComponent;
 
 // Needs to be UENUM if using Blueprints
 UENUM(BlueprintType)
@@ -128,6 +137,8 @@ enum EPlayerState
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPlayerState, NewState);
+
+// DELETE THIS?
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCanJumpBackChanged, bool, CanJumpBack);
 
 UCLASS()
@@ -143,12 +154,25 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnCanJumpBackChanged OnCanJumpBackChanged;
 	
+	void SetSavedState(EPlayerState NewState) { SavedState = NewState; }
+	void SetNewAnimation(ECurrentAnimation NewMode) { MyAnimationComponent->SetCurrentAnimation(NewMode); }
+	
 	UFUNCTION(BlueprintCallable)
 	float GetMovementEnergy() { return MovementEnergy; }
 	float GetSlowMotionTimeDilation() const { return SlowMotionDilation; }
 	bool GetWallIsInFront();
+	bool GetIsUsingHookshot() { return bIsUsingHookshot; }
+
 	FVector GetLocation() const { return GetActorLocation(); }
-	UMyMovementModeComponent* GetMovementModeComponent() { return MyMovementModeComponent; }
+	UMyMovementModeComponent* GetMovementModeComponent() { return MyAnimationComponent; }
+	EPlayerState GetCurrentState() { return CurrentState; }
+
+	void MovePlayer(const FVector& Destination, float Duration) const;
+	void SetDeceleration(const float Value) const { GetCharacterMovement()->BrakingDecelerationFlying = Value; }
+	void SetMovementMode(const EMovementMode NewMode) const { GetCharacterMovement()->MovementMode = NewMode; }
+	bool GetIsMidAir() const;
+
+	ECollisionChannel GetBlockCollision() { return BlockAllCollision; }
 
 private:
 #pragma region ---------- VARIABLES -----------
@@ -173,16 +197,18 @@ private:
 			bool bIsExhausted = false;
 			bool bCanGainEnergy = true;
 
-		/* Climbing */
-			/* Climb jump */// Impulse or velocity? 
-				float CantClimbTimer = 0.f;
-				bool bIsJumpingOutFromWall;
-				UPROPERTY()
-				AActor* CurrentClimbingWall;
+		/* Jumping */
+			/* Climb jump */
+			// ??? Impulse or velocity ??? 
 
-			/* Ledge climbing */
-				FVector LedgeClimbDestination; 
-				bool bIsClimbingLedge = false;
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float ClimbJumpOutImpulseUp = 55000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float ClimbJumpOutImpulseBack = 60000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float VelocityClimbJumpOutUp = 550.f;
+			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+			float VelocityClimbJumpOutBack = 600.f;
 
 			/* Sliding */
 				bool bIsSlidingDown = false;
@@ -205,20 +231,28 @@ private:
 		TEnumAsByte<EPlayerState> SavedState;
 		// Previous state, to check if it has been changed
 		TEnumAsByte<EPlayerState> PreviousState;
-	
+
+	/* Collisions */ 
+		UPROPERTY(EditDefaultsOnly, Category=Energy)
+		TEnumAsByte<ECollisionChannel> BlockAllCollision;
+		
 	/* Attachments */
 		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
-		UMyMovementModeComponent* MyMovementModeComponent;
+		UMyMovementModeComponent* MyAnimationComponent;
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = MovementComponent, meta = (AllowPrivateAccess = "true"))
+		UMyClimbComponent* ClimbComponent;
 
 		/* Data assets */
 			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
 			UGroundMovementDataAsset* GroundMovementData;
 			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
 			UEnergyDataAsset* EnergyData;
-			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-			UClimbMovementDataAsset* ClimbData;
+			// UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			// UClimbMovementDataAsset* ClimbData;
 			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
 			UHookshotDataAsset* HookshotData;
+			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			UHookshotDataAsset* JumpData;
 
 #pragma endregion
 	
@@ -227,6 +261,8 @@ private:
 		void PlayerStateSwitch();
 	
 	/* Character movement */
+			void SetMovementMode();
+	
 		/* Basic character movement */
 			void MovementOutput();
 			void SetPlayerVelocity(const FVector& Value) const;
@@ -248,17 +284,10 @@ private:
 			virtual void HandleJumpInput() override;
 			virtual void Landed(const FHitResult& Hit) override;
 			bool GetCanJumpBackwards() const;
-			bool GetIsMidAir() const;
 			void CheckIfFalling();
 		
 		/* Climbing */
-			void FindClimbableWall();
-			void FindClimbRotation();
-			void SetPlayerRotation(const FRotator& TargetRotation);
 			virtual void CancelAction() override;
-
-			/* Ledge climbing */
-				void LookForLedge();
 
 			/* Sliding */
 				void DecideIfShouldSlide();
@@ -275,9 +304,6 @@ private:
 
 	/* Hookshot */
 		virtual void HandleActionInput() override;
-
-	/* Static functions */
-		static float FindSmallestFloat(TArray<float>);
 
 	/* Inherited functions */
 		virtual void BeginPlay() override;

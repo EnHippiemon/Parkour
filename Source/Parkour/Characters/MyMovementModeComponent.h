@@ -6,7 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "MyMovementModeComponent.generated.h"
 
-enum ECurrentMovementMode
+enum ECurrentAnimation
 {
 	Ecmm_Idle,
 	Ecmm_Walking,
@@ -39,11 +39,11 @@ public:
 
 	UTexture2D* GetCurrentMovementTexture() { return CurrentMovementTexture; }
 
-	void SetCurrentMovementMode(ECurrentMovementMode Movement);
+	void SetCurrentAnimation(ECurrentAnimation Movement);
 	
 private:
 	// Movement mode, checks all types of movement and is used for anims etc
-	TEnumAsByte<ECurrentMovementMode> MovementMode;
+	TEnumAsByte<ECurrentAnimation> MovementMode;
 
 #pragma region --- UI Textures ---
 	UPROPERTY()

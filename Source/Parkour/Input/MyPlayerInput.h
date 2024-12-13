@@ -21,6 +21,10 @@ public:
 	FVector2D GetCameraInput() const { return CameraMovement; }
 	UMyCameraComponent* GetCamera() const { return CameraComponent; }
 
+	/* Basic character movement */
+	float GetMovementForward() const { return CharacterMovementForward; }
+	float GetMovementSideways() const { return CharacterMovementSideways; }
+	
 protected:
 	/* ---------- VARIABLES ----------- */
 
@@ -34,11 +38,6 @@ protected:
 	/* ---------- FUNCTIONS ----------- */
 	
 	/* Character movement */
-		/* Basic character movement */
-			float GetMovementForward() const { return CharacterMovementForward; }
-			float GetMovementSideways() const { return CharacterMovementSideways; }
-	
-	
 		/* Speed changes */
 			virtual void HandleSprintInput() {}
 			virtual void HandleSprintStop() {}

@@ -8,7 +8,7 @@ UMyMovementModeComponent::UMyMovementModeComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UMyMovementModeComponent::SetCurrentMovementMode(ECurrentMovementMode Movement)
+void UMyMovementModeComponent::SetCurrentAnimation(ECurrentAnimation Movement)
 {
 	if (MovementMode == Movement)
 		return;

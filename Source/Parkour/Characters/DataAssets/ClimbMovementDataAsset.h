@@ -21,19 +21,9 @@ public:
 		UPROPERTY(EditDefaultsOnly, Category=Climbing)
 		float ClimbingWidth = 40.f;
 
-		/* Climb jump */
-		// ??? Impulse or velocity ??? 
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float ClimbJumpingTime = 0.5f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float ClimbJumpOutImpulseUp = 55000.f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float ClimbJumpOutImpulseBack = 60000.f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float VelocityClimbJumpOutUp = 550.f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float VelocityClimbJumpOutBack = 600.f;
-
+		UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
+		float ClimbJumpingTime = 0.5f;
+		
 		/* Ledge climbing */
 			UPROPERTY (EditDefaultsOnly, Category="Climbing|Ledge")
 			float BottomLedgeDetectionZOffset = 40.f;
