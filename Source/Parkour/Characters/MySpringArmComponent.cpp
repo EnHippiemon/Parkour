@@ -155,11 +155,6 @@ void UMySpringArmComponent::StateSwitch(EPlayerState State)
 	CurrentState = State;
 }
 
-void UMySpringArmComponent::UpdateWallIsInFront(bool WallIsInFront)
-{
-	bWallIsInFront = WallIsInFront;
-}
-
 void UMySpringArmComponent::TickStateSwitch()
 {
 	switch(CurrentState)
@@ -197,7 +192,7 @@ void UMySpringArmComponent::CheckWallBehindPlayer()
 	if (!bHasNoWallForDuration)
 		TimeSinceWallBehindPlayer += World->DeltaTimeSeconds;
 	
-	if (CurrentState != Eps_Climbing && bWallIsInFront && bHasNoWallForDuration)
+	if (CurrentState != Eps_Climbing && Player->GetWallIsInFront() && bHasNoWallForDuration)
 		return;
 	
 	// DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
@@ -231,10 +226,7 @@ void UMySpringArmComponent::BeginPlay()
 	Player = Cast<AMyCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 
 	if (IsValid(Player))
-	{
 		Player->OnStateChanged.AddUniqueDynamic(this, &UMySpringArmComponent::StateSwitch);
-		Player->OnCanJumpBackChanged.AddUniqueDynamic(this, &UMySpringArmComponent::UpdateWallIsInFront);
-	}
 	
 	if (!ArmData)
 		UE_LOG(LogTemp, Error, TEXT("MySpringArmComponent.cpp - Data asset missing!"));

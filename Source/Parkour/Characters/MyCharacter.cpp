@@ -12,6 +12,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "../FStaticFunctions.h"
 
 AMyCharacter::AMyCharacter()
 {
@@ -32,6 +33,11 @@ AMyCharacter::AMyCharacter()
 		HookshotData = Hookshot.Object;
 }
 
+bool AMyCharacter::GetWallIsInFront()
+{
+	return FloorAngle > GroundMovementData->ThresholdToJumpBack;
+}
+
 void AMyCharacter::PlayerStateSwitch()
 {
 	// Checks state once when it has changed 
@@ -42,13 +48,9 @@ void AMyCharacter::PlayerStateSwitch()
 		case Eps_Walking:
 			GetCharacterMovement()->SetWalkableFloorAngle(50.f);
 			GetCharacterMovement()->bOrientRotationToMovement = true;
-			if (!bIsExhausted && !GetIsMidAir())
-				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
 			break;
 		case Eps_Sprinting:
 			GetCharacterMovement()->SetWalkableFloorAngle(90.f);
-			if (!GetIsMidAir())
-				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Sprinting);
 			break;
 		case Eps_Idle:
 			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Idle);
@@ -67,6 +69,8 @@ void AMyCharacter::PlayerStateSwitch()
 			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
 			if (bIsUsingHookshot)
 				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_LeavingAim);
+			else if (GetIsMidAir())
+				MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Jumping);
 			break;
 		case Eps_Climbing:
 			GetCharacterMovement()->MovementMode = MOVE_Flying;
@@ -79,19 +83,22 @@ void AMyCharacter::PlayerStateSwitch()
 		OnStateChanged.Broadcast(CurrentState);
 		PreviousState = CurrentState;
 	}
-	// Move this up one line 
-
+	
 	// Checks state every tick  
 	switch (CurrentState)
 	{
 	case Eps_Walking:
 		CheckIdleness();
 		TargetMovementSpeed = GroundMovementData->MaxWalkSpeed * MovementSpeedPercent * MovementEnergy;
+		if (!bIsExhausted && !GetIsMidAir() && !bIsClimbingLedge)
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
 		break;
 	case Eps_Sprinting:
 		TargetMovementSpeed = GroundMovementData->MaxSprintSpeed * MovementSpeedPercent * MovementEnergy;
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
+		if (!GetIsMidAir() && !bHasReachedWallWhileSprinting && !bIsClimbingLedge)
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Sprinting);
 		break;
 	case Eps_Idle:
 		CheckIdleness();
@@ -135,9 +142,9 @@ void AMyCharacter::PlayerStateSwitch()
 
 void AMyCharacter::MovementOutput()
 {
-	if (Controller == nullptr)
+	if (!IsValid(Controller))
 	{
-		UE_LOG(LogTemp, Error, TEXT("MyCharacter Line 99, no controller"));
+		UE_LOG(LogTemp, Error, TEXT("MyCharacter.cpp - no controller"));
 		return;
 	}
 	
@@ -232,14 +239,14 @@ void AMyCharacter::CheckFloorAngle()
 	}
 	
 	// Get the shortest trace. Divide by 100 to make it 0-1. 
-	FloorAngle = FindSmallestFloat(TraceDistances) * 0.01f;
+	FloorAngle = FStaticFunctions::FindSmallestFloat(TraceDistances) * 0.01f;
 }
 
 void AMyCharacter::DecideIfShouldSlide()
 {
 	// Decide if the player should slide down a wall 
-	if (FloorAngle < GroundMovementData->ThresholdToJumpBack && GetCharacterMovement()->Velocity.Z < 0.f &&
-		!bIsExhausted && CurrentState != Eps_Climbing && !bHasReachedWallWhileSprinting)
+	if (FloorAngle < GroundMovementData->ThresholdToJumpBack && GetCharacterMovement()->Velocity.Z < 0.f && !bIsClimbingLedge &&
+		!bIsExhausted && CurrentState != Eps_Climbing && CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting)
 	{
 		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
 		GetCharacterMovement()->GravityScale = 0.f;
@@ -250,15 +257,11 @@ void AMyCharacter::DecideIfShouldSlide()
 	{
 		GetCharacterMovement()->GravityScale = GroundMovementData->GravityScale;
 		bIsSlidingDown = false;
-		if (GetCharacterMovement()->Velocity.Z < 0.f && CurrentState != Eps_Aiming)
-			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Jumping);
 	}
 }
 
 void AMyCharacter::CheckExhaustion()
 {
-	float MovementLoss = 0.f;
-	
 	if (MovementEnergy >= 1.f && bIsExhausted)
 	{
 		MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Walking);
@@ -271,6 +274,11 @@ void AMyCharacter::CheckExhaustion()
 		bIsExhausted = true;
 		CurrentState = CurrentState == Eps_Aiming ? Eps_LeaveAiming : Eps_Walking;
 	}
+}
+
+void AMyCharacter::EnergyUsage()
+{
+	float MovementLoss = 0.f;
 
 	const auto CorrectedFloorAngle = -FloorAngle + 1.007908f;
 	const auto ScaledFloorAngle = UKismetMathLibrary::NormalizeToRange(CorrectedFloorAngle, 0, 0.4f);
@@ -492,16 +500,6 @@ void AMyCharacter::CheckShouldStopMovementOverTime()
 	bShouldStopMovementOverTime = true;
 }
 
-void AMyCharacter::CheckIfWallIsInFront()
-{
-	// If value hasn't changed, don't do anything
-	if (bWallIsInFront == FloorAngle > GroundMovementData->ThresholdToJumpBack)
-		return;
-
-	bWallIsInFront = FloorAngle > GroundMovementData->ThresholdToJumpBack;
-	OnCanJumpBackChanged.Broadcast(bWallIsInFront);
-}
-
 void AMyCharacter::SetTimeDilation()
 {
 	if (!GetIsMidAir() && UGameplayStatics::GetGlobalTimeDilation(GetWorld()) < 1)
@@ -518,9 +516,16 @@ bool AMyCharacter::GetIsMidAir() const
 	return GetCharacterMovement()->Velocity.Z == 0 ? 0 : 1;
 }
 
+void AMyCharacter::CheckIfFalling()
+{
+	if (!bIsSlidingDown && GetCharacterMovement()->Velocity.Z < 0.f && CurrentState != Eps_Climbing && CurrentState != Eps_Aiming &&
+		CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting && !bIsExhausted && !bIsClimbingLedge)
+			MyMovementModeComponent->SetCurrentMovementMode(Ecmm_Jumping);
+}
+
 void AMyCharacter::FindClimbableWall()
 {
-	if (bIsClimbingLedge)
+	if (bIsClimbingLedge || bIsUsingHookshot)
 		return;
 	
 	if (CantClimbTimer < ClimbData->ClimbJumpingTime)
@@ -664,7 +669,7 @@ void AMyCharacter::LookForLedge()
 			bIsClimbingLedge = false;
 		return;
 	}
-	if (!GetIsMidAir())
+	if (!GetIsMidAir() || bIsUsingHookshot)
 		return; 
 
 	auto World = GetWorld();
@@ -773,19 +778,6 @@ void AMyCharacter::HandleActionInput()
 			LatentActionInfo
 			);
 	}
-}
-
-// Move to ?abstract? class 
-float AMyCharacter::FindSmallestFloat(TArray<float> Array)
-{
-	float SmallestValue = FLT_MAX;
-	for(int i = 0; i < Array.Num(); i++)
-	{
-		if (Array[i] < SmallestValue)
-			SmallestValue = Array[i];
-	}
-	
-	return SmallestValue;
 }
 
 void AMyCharacter::RunUpToWall()
@@ -902,10 +894,13 @@ void AMyCharacter::Tick(float const DeltaTime)
 
 	MovementOutput();
 	CheckFloorAngle();
-	CheckIfWallIsInFront();
+	CheckIfFalling();
+
+	/* Energy */
+	CheckExhaustion();
+	EnergyUsage();
 	
 	/* Climbing */
-	CheckExhaustion();
 	FindClimbableWall();
 	LookForLedge();
 	DecideIfShouldSlide();

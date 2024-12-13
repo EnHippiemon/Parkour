@@ -46,9 +46,6 @@ private:
 	UFUNCTION()
 	void StateSwitch(EPlayerState State);
 
-	UFUNCTION()
-	void UpdateWallIsInFront(bool CanJumpBack);
-
 	void TickStateSwitch();
 	void CameraLerp(float& Value, float Speed, float Clamp) const;
 	void CheckWallBehindPlayer();

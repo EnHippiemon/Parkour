@@ -145,11 +145,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	float GetMovementEnergy() { return MovementEnergy; }
-
 	float GetSlowMotionTimeDilation() const { return SlowMotionDilation; }
-	
+	bool GetWallIsInFront();
 	FVector GetLocation() const { return GetActorLocation(); }
-
 	UMyMovementModeComponent* GetMovementModeComponent() { return MyMovementModeComponent; }
 
 private:
@@ -167,9 +165,6 @@ private:
 		/* Speed */
 			float TargetMovementSpeed = 600.f;
 			bool bShouldStopMovementOverTime = false;
-	
-		/* Jumping */
-			bool bWallIsInFront = false;
 
 		/* Energy */
 			float MovementEnergy = 1.00f;
@@ -238,20 +233,23 @@ private:
 
 		/* Speed changes */
 			void CheckFloorAngle();
-			void CheckExhaustion();
 			virtual void HandleSprintInput() override;
 			virtual void HandleSprintStop() override;
 			void SetMovementSpeed(const float TargetSpeed) const;
 			void StopMovementOverTime();
 			void CheckShouldStopMovementOverTime();
-			void CheckIfWallIsInFront();
 			void SetTimeDilation();
 
+		/* Energy */
+			void CheckExhaustion();
+			void EnergyUsage();
+	
 		/* Jumping */
 			virtual void HandleJumpInput() override;
 			virtual void Landed(const FHitResult& Hit) override;
 			bool GetCanJumpBackwards() const;
 			bool GetIsMidAir() const;
+			void CheckIfFalling();
 		
 		/* Climbing */
 			void FindClimbableWall();
