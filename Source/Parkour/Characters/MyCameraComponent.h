@@ -1,13 +1,12 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
-#include "../Characters/MyCharacter.h"
+// #include "../Characters/MyCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/DataAsset.h"
 #include "MyCameraComponent.generated.h"
 
+class AMyCharacter;
 enum EPlayerState;
 
 class UCameraDataAsset;
@@ -19,8 +18,6 @@ class PARKOUR_API UMyCameraComponent : public UCameraComponent
 
 private:
 	UMyCameraComponent();
-
-#pragma endregion
 	
 	UFUNCTION()
 	void StateSwitch(EPlayerState State);

@@ -20,6 +20,8 @@ public:
 		float PlayerToWallDistance = 70.f;
 		UPROPERTY(EditDefaultsOnly, Category=Climbing)
 		float ClimbingWidth = 40.f;
+		UPROPERTY(EditDefaultsOnly, Category=Climbing)
+		float RotateToWallSpeed = 0.5f;
 
 		UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
 		float ClimbJumpingTime = 0.5f;

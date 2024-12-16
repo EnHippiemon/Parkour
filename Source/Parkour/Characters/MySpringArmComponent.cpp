@@ -51,10 +51,10 @@ void UMySpringArmComponent::CameraOffsetByLooking(const FVector2D CameraMove)
 	const FVector CharacterForwardVector = Player->GetActorForwardVector();
 	constexpr float InputSensitivityThreshold = 0.005f;
 	
-	float CameraSpeed = ArmData->CameraYDirectionSpeed / (CharacterForwardVector.Length() + 1);
+	float CameraSpeed = ArmData->CameraYZOffsetSpeedOnLook / (CharacterForwardVector.Length() + 1);
 	if (CurrentState == Eps_Climbing)
 	{
-		CameraSpeed = ArmData->CameraYDirectionSpeed * 2;
+		CameraSpeed = ArmData->CameraYZOffsetSpeedOnLook * 2;
 		if (CameraMove.Y < -InputSensitivityThreshold)
 			CameraLerp(CurrentCameraOffsetZ, -CameraSpeed, ArmData->OffsetClamp.Z);
 		else if (CameraMove.Y > InputSensitivityThreshold)
@@ -85,9 +85,9 @@ void UMySpringArmComponent::CameraOffsetByMovement()
 
 	// Sideways camera movement. Check if character's movement is towards left or right side of camera. 
 	if ((CharacterMovement.Rotation().Vector() - CameraRightVector).Length() > LeftThreshold)
-		CameraLerp(CurrentCameraOffsetY, -ArmData->CameraYDirectionSpeed, ArmData->OffsetClamp.Y);
+		CameraLerp(CurrentCameraOffsetY, -ArmData->CameraYZOffsetSpeedOnMove, ArmData->OffsetClamp.Y);
 	else if ((CharacterMovement.Rotation().Vector() - CameraRightVector).Length() < RightThreshold)
-		CameraLerp(CurrentCameraOffsetY, ArmData->CameraYDirectionSpeed, ArmData->OffsetClamp.Y);
+		CameraLerp(CurrentCameraOffsetY, ArmData->CameraYZOffsetSpeedOnMove, ArmData->OffsetClamp.Y);
 
 	if (CurrentState != Eps_Climbing)
 		return;
@@ -97,21 +97,22 @@ void UMySpringArmComponent::CameraOffsetByMovement()
 
 	// Upwards camera movement (while climbing!)
 	if (Player->GetMovementInput().Z > UpThreshold)
-		CameraLerp(CurrentCameraOffsetZ, ArmData->CameraYDirectionSpeed, ArmData->OffsetClamp.Z);
+		CameraLerp(CurrentCameraOffsetZ, ArmData->CameraYZOffsetSpeedOnMove, ArmData->OffsetClamp.Z);
 	else if (Player->GetMovementInput().Z < DownThreshold)
-		CameraLerp(CurrentCameraOffsetZ, -ArmData->CameraYDirectionSpeed, ArmData->OffsetClamp.Z);
+		CameraLerp(CurrentCameraOffsetZ, -ArmData->CameraYZOffsetSpeedOnMove, ArmData->OffsetClamp.Z);
 }
 
 void UMySpringArmComponent::SetCameraOffset()
 {
+	auto DeltaTime = GetWorld()->DeltaTimeSeconds;
 	if (CurrentState != Eps_Climbing)
 	{
-		CurrentCameraOffsetZ = FMath::Lerp(CurrentCameraOffsetZ, 0.f, ArmData->WalkingExtensionSpeed);
-		TargetOffset = FMath::Lerp(TargetOffset, FVector(0, 0, 0), ArmData->SprintExtensionSpeed);
+		CurrentCameraOffsetZ = FMath::Lerp(CurrentCameraOffsetZ, 0.f, ArmData->WalkingExtensionSpeed * DeltaTime);
+		TargetOffset = FMath::Lerp(TargetOffset, FVector(0, 0, 0), ArmData->SprintExtensionSpeed * DeltaTime);
 	}
 
 	if (CurrentState != Eps_Aiming)
-		SocketOffset = FMath::Lerp(SocketOffset, FVector(0.f, CurrentCameraOffsetY, CurrentCameraOffsetZ), ArmData->WalkingExtensionSpeed);
+		SocketOffset = FMath::Lerp(SocketOffset, FVector(0.f, CurrentCameraOffsetY, CurrentCameraOffsetZ), ArmData->WalkingExtensionSpeed * DeltaTime);
 }
 
 void UMySpringArmComponent::SetRotationSpeed()
@@ -157,27 +158,28 @@ void UMySpringArmComponent::StateSwitch(EPlayerState State)
 
 void UMySpringArmComponent::TickStateSwitch()
 {
+	const auto DeltaTime = GetWorld()->DeltaTimeSeconds;
 	switch(CurrentState)
 	{
 	case Eps_Walking:
-		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->WalkingSpringArmLength, ArmData->WalkingExtensionSpeed);
+		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->WalkingSpringArmLength, ArmData->WalkingExtensionSpeed * DeltaTime);
 		break;
 	case Eps_Sprinting:
-		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->SprintingSpringArmLength, ArmData->SprintExtensionSpeed);
+		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->SprintingSpringArmLength, ArmData->SprintExtensionSpeed * DeltaTime);
 		break;
 	case Eps_Idle:
-		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->IdleSpringArmLength, ArmData->IdleExtensionSpeed);
+		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->IdleSpringArmLength, ArmData->IdleExtensionSpeed * DeltaTime);
 		break;
 	case Eps_Aiming:
-		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->AimingSpringArmLength, ArmData->AimingExtensionSpeed);
-		SocketOffset = FMath::Lerp(SocketOffset, ArmData->AimingCameraOffset, ArmData->AimingOffsetSpeed);
+		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->AimingSpringArmLength, ArmData->AimingExtensionSpeed * DeltaTime);
+		SocketOffset = FMath::Lerp(SocketOffset, ArmData->AimingCameraOffset, ArmData->AimingOffsetSpeed * DeltaTime);
 		break;
 	case Eps_LeaveAiming:
-		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->HookshotSpringArmLength, ArmData->HookshotExtensionSpeed);
+		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->HookshotSpringArmLength, ArmData->HookshotExtensionSpeed * DeltaTime);
 		break;
 	case Eps_Climbing:
-		TargetOffset = FMath::Lerp(TargetOffset, Player->GetActorForwardVector() * ArmData->ClimbingSpringArmTargetOffset, ArmData->ClimbingOffsetSpeed);
-		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->ClimbingSpringArmLength, ArmData->ClimbingExtensionSpeed);
+		TargetOffset = FMath::Lerp(TargetOffset, Player->GetActorForwardVector() * ArmData->ClimbingSpringArmTargetOffset, ArmData->ClimbingOffsetSpeed * DeltaTime);
+		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->ClimbingSpringArmLength, ArmData->ClimbingExtensionSpeed * DeltaTime);
 		break;
 	default:
 		break;
@@ -197,7 +199,7 @@ void UMySpringArmComponent::CheckWallBehindPlayer()
 	
 	// DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 	if (!bHasNoWallForDuration)
-		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->ArmLengthWallBehindPlayer, ArmData->SprintExtensionSpeed);
+		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->ArmLengthWallBehindPlayer, ArmData->SprintExtensionSpeed * World->DeltaTimeSeconds);
 
 	const auto ActorLocation = Player->GetLocation();
 	const auto ForwardVector = Player->GetActorForwardVector();

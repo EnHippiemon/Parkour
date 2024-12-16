@@ -33,7 +33,9 @@ public:
 		/* Offset speed */
 			// Decides how quickly the camera moves from side to side. 
 			UPROPERTY(EditDefaultsOnly, Category="Offset|Speed")
-			float CameraYDirectionSpeed = 1000.f;
+			float CameraYZOffsetSpeedOnLook = 1000.f;
+			UPROPERTY(EditDefaultsOnly, Category="Offset|Speed")
+			float CameraYZOffsetSpeedOnMove = 1000.f;
 			UPROPERTY(EditDefaultsOnly, Category="Offset|Speed")
 			float ClimbingOffsetSpeed = 0.01f;
 			UPROPERTY(EditDefaultsOnly, Category="Offset|Speed")

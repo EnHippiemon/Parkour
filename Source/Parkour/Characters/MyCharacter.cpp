@@ -6,19 +6,21 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MyCameraComponent.h"
 #include "MyClimbComponent.h"
+#include "MyHookshotComponent.h"
 #include "DataAssets/GroundMovementDataAsset.h"
 #include "DataAssets/EnergyDataAsset.h"
-// #include "DataAssets/ClimbMovementDataAsset.h"
 #include "DataAssets/HookshotDataAsset.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "../FStaticFunctions.h"
 
+
 AMyCharacter::AMyCharacter()
 {
 	MyAnimationComponent = CreateDefaultSubobject<UMyMovementModeComponent>("MovementModeComponent");
 	ClimbComponent = CreateDefaultSubobject<UMyClimbComponent>("ClimbComponent");
+	HookshotComponent = CreateDefaultSubobject<UMyHookshotComponent>("HookshotComponent");
 	
 	// Hard setting the data assets 
 	static ConstructorHelpers::FObjectFinder<UGroundMovementDataAsset> GroundMovement(TEXT("/Game/Player/DataAssets/GroundMovementDataAsset"));
@@ -27,9 +29,6 @@ AMyCharacter::AMyCharacter()
 	static ConstructorHelpers::FObjectFinder<UEnergyDataAsset> Energy(TEXT("/Game/Player/DataAssets/EnergyDataAsset"));
 	if (Energy.Object)
 		EnergyData = Energy.Object;
-	static ConstructorHelpers::FObjectFinder<UHookshotDataAsset> Hookshot(TEXT("/Game/Player/DataAssets/HookshotDataAsset"));
-	if (Hookshot.Object)
-		HookshotData = Hookshot.Object;
 }
 
 bool AMyCharacter::GetWallIsInFront()
@@ -66,10 +65,7 @@ void AMyCharacter::PlayerStateSwitch()
 			GetCharacterMovement()->bOrientRotationToMovement = true;
 			GetCharacterMovement()->bUseControllerDesiredRotation = false;
 			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
-			if (bIsUsingHookshot)
-				MyAnimationComponent->SetCurrentAnimation(Ecmm_LeavingAim);
-			else if (GetIsMidAir())
-				MyAnimationComponent->SetCurrentAnimation(Ecmm_Jumping);
+
 			break;
 		case Eps_Climbing:
 			GetCharacterMovement()->MovementMode = MOVE_Flying;
@@ -117,13 +113,7 @@ void AMyCharacter::PlayerStateSwitch()
 			HandleSecondaryActionStop();
 		break;
 	case Eps_LeaveAiming:
-		if (bIsUsingHookshot && (GetActorLocation() - TargetLocation).Length() < 10.f)
-			bIsUsingHookshot = false;
-
-		if (!bIsUsingHookshot && SavedState == Eps_Sprinting)
-			CurrentState = Eps_Walking;
-		else if (!bIsUsingHookshot)
-			CurrentState = SavedState;
+		CurrentState = HookshotComponent->LeaveAiming(this);
 		break;
 	case Eps_Climbing:
 		break;		
@@ -133,7 +123,7 @@ void AMyCharacter::PlayerStateSwitch()
 		break;
 	}
 			
-	if (bIsUsingHookshot || bHasReachedWallWhileSprinting || ClimbComponent->IsClimbingLedge())
+	if (HookshotComponent->GetIsUsingHookshot() || bHasReachedWallWhileSprinting || ClimbComponent->IsClimbingLedge())
 		SetPlayerVelocity(FVector(0, 0, 0));
 }
 
@@ -508,14 +498,14 @@ bool AMyCharacter::GetCanJumpBackwards() const
 	return FloorAngle < GroundMovementData->ThresholdToJumpBack && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f;
 }
 
-void AMyCharacter::MovePlayer(const FVector& Destination, const float Duration) const
+void AMyCharacter::MovePlayer(const FVector& Destination, const bool EaseInOut, const float Duration)
 {
 	UKismetSystemLibrary::MoveComponentTo(
 	RootComponent,
 	Destination,
-	GetActorRotation(),
-	true,
-	true,
+	FRotator(0, GetActorRotation().Yaw, 0),
+	EaseInOut,
+	EaseInOut,
 	Duration,
 	false,
 	EMoveComponentAction::Move,
@@ -584,38 +574,7 @@ void AMyCharacter::HandleSecondaryActionStop()
 // Look for target to use hookshot on
 void AMyCharacter::HandleActionInput()
 {
-	if (CurrentState != Eps_Aiming)
-		return;
-	
-	FHitResult HookshotTarget;
-	FCollisionQueryParams Parameters;
-	Parameters.AddIgnoredActor(this);
-
-	const FVector StartHookSearch = CameraComponent->GetComponentLocation();
-	const FVector EndHookSearch = CameraComponent->GetComponentLocation() + CameraComponent->GetForwardVector() * HookshotData->HookLength;
-
-	DrawDebugLine(GetWorld(), StartHookSearch, EndHookSearch, FColor::Purple, false, 0.1f, 0.f, 3.f);
-
-	const auto HookTrace = GetWorld()->LineTraceSingleByChannel(HookshotTarget, StartHookSearch, EndHookSearch, HookshotData->HookCollision, Parameters, FCollisionResponseParams());
-	if (HookTrace)
-	{
-		const FVector TargetOffset = CameraComponent->GetForwardVector() * 50.f + FVector(0, 0, 100.f);
-		TargetLocation = HookshotTarget.Location - TargetOffset;
-		bIsUsingHookshot = true;
-		CurrentState = Eps_LeaveAiming;
-		
-		UKismetSystemLibrary::MoveComponentTo(
-			RootComponent,
-			TargetLocation,
-			FRotator(0, CameraComponent->GetForwardVector().Rotation().Yaw, 0),
-			false,
-			false,
-			HookshotTarget.Distance/HookshotData->HookshotSpeed,
-			false,
-			EMoveComponentAction::Move,
-			LatentActionInfo
-			);
-	}
+	CurrentState = HookshotComponent->UseHookshot(this);
 }
 
 void AMyCharacter::RunUpToWall()
@@ -722,7 +681,7 @@ void AMyCharacter::BeginPlay()
 
 	MyAnimationComponent->SetCurrentAnimation(Ecmm_Walking);
 
-	if (!GroundMovementData || !EnergyData || !HookshotData)
+	if (!GroundMovementData || !EnergyData)
 		UE_LOG(LogTemp, Error, TEXT("MyCharacter.cpp - Data Asset missing!"))
 }
 

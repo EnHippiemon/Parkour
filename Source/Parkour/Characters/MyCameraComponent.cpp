@@ -2,7 +2,7 @@
 
 
 #include "../Characters/MyCameraComponent.h"
-
+#include "../Characters/MyCharacter.h"
 #include "DataAssets/CameraDataAsset.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -28,34 +28,35 @@ void UMyCameraComponent::StateSwitch(EPlayerState State)
 
 void UMyCameraComponent::TickStateSwitch()
 {
+	const auto DeltaTime = GetWorld()->DeltaTimeSeconds;
 	switch(CurrentState)
 	{
 	case Eps_Walking:
 		FieldOfView = Player->GetCharacterMovement()->Velocity.Length() == 0
-		? FieldOfView = FMath::Lerp(FieldOfView, CameraData->StillFOV, CameraData->StillFOVSpeed)
-		: FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->WalkingFOVSpeed);
+		? FieldOfView = FMath::Lerp(FieldOfView, CameraData->StillFOV, CameraData->StillFOVSpeed * DeltaTime)
+		: FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->WalkingFOVSpeed * DeltaTime);
 		break;
 	case Eps_Sprinting:
-		FieldOfView = FMath::Lerp(FieldOfView, CameraData->SprintingFOV, CameraData->SprintFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->SprintingFOV, CameraData->SprintFOVSpeed * DeltaTime);
 		break;
 	case Eps_Idle:
-		FieldOfView = FMath::Lerp(FieldOfView, CameraData->IdleFOV, CameraData->IdleFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->IdleFOV, CameraData->IdleFOVSpeed * DeltaTime);
 		break;
 	case Eps_Aiming:
-		FieldOfView = FMath::Lerp(FieldOfView, CameraData->AimingFOV, CameraData->AimingFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->AimingFOV, CameraData->AimingFOVSpeed * DeltaTime);
 		break;
 	case Eps_LeaveAiming:
-		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->WalkingFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->WalkingFOVSpeed * DeltaTime);
 		break;
 	case Eps_Climbing:
-		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->ClimbingFOVSpeed);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, CameraData->ClimbingFOVSpeed * DeltaTime);
 		break;
 	default:
 		break;
 	}
 	
 	if (CurrentState != Eps_Idle)
-		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, 0.001f);
+		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, 0.001f * DeltaTime);
 }
 
 void UMyCameraComponent::BeginPlay()

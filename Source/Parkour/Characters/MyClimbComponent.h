@@ -49,9 +49,9 @@ private:
 	
 	/* Climbing */
 	void FindClimbRotation();
-	void SetPlayerRotation(const FRotator& TargetRotation);
+	void SetPlayerRotation(const FRotator& TargetRotation) const;
 
-	void ForcePlayerOntoWall();
+	void ForcePlayerOntoWall() const;
 
 	void LookForLedge();
 

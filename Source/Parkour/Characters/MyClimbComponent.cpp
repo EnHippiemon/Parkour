@@ -1,6 +1,7 @@
 #include "../Characters/MyClimbComponent.h"
 
 #include "MyCharacter.h"
+#include "MyHookshotComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "DataAssets/ClimbMovementDataAsset.h"
@@ -18,13 +19,14 @@ UMyClimbComponent::UMyClimbComponent()
 
 EPlayerState UMyClimbComponent::FindClimbableWall()
 {
-	if (bIsClimbingLedge || Player->GetIsUsingHookshot())
+	if (bIsClimbingLedge || Player->GetHookshotComponent()->GetIsUsingHookshot())
 		return Player->GetCurrentState();
 	
 	if (CantClimbTimer < ClimbData->ClimbJumpingTime)
 	{
 		CantClimbTimer += GetWorld()->DeltaTimeSeconds;
 		FindClimbRotation();
+		UE_LOG(LogTemp, Log, TEXT("CurrentState: %d"), Player->GetCurrentState());
 		return Player->GetCurrentState();
 	}
 
@@ -35,9 +37,9 @@ EPlayerState UMyClimbComponent::FindClimbableWall()
 
 	constexpr int TraceLength = 80;
 	const FVector StartWallAngle = ActorLocation;
-	const FVector EndForwardAngle = ActorLocation + ForwardVector * TraceLength;
-	const FVector EndRightAngle = ActorLocation + ForwardVector * TraceLength + RightVector * ClimbData->ClimbingWidth;
-	const FVector EndLeftAngle = ActorLocation + ForwardVector * TraceLength - RightVector * ClimbData->ClimbingWidth;
+	const FVector EndForwardAngle = StartWallAngle + ForwardVector * TraceLength;
+	const FVector EndRightAngle = StartWallAngle + ForwardVector * TraceLength + RightVector * ClimbData->ClimbingWidth;
+	const FVector EndLeftAngle = StartWallAngle + ForwardVector * TraceLength - RightVector * ClimbData->ClimbingWidth;
 
 	FHitResult HitResultForward;
 	FHitResult HitResultRight;
@@ -131,13 +133,13 @@ void UMyClimbComponent::FindClimbRotation()
 	SetPlayerRotation(HitResultPlayerRotation.ImpactNormal.Rotation());
 }
 
-void UMyClimbComponent::SetPlayerRotation(const FRotator& TargetRotation)
+void UMyClimbComponent::SetPlayerRotation(const FRotator& TargetRotation) const
 {
 	Player->SetActorRotation(FMath::Lerp(
 		Player->GetActorRotation(),
 		FRotator(0.f, 180.f, 0.f)
 		+ FRotator(-TargetRotation.Pitch, TargetRotation.Yaw, 0.f),
-		0.05f));
+		ClimbData->RotateToWallSpeed * GetWorld()->DeltaTimeSeconds));
 }
 
 // Interrupt climbing
@@ -151,7 +153,7 @@ EPlayerState UMyClimbComponent::StopClimbing()
 	return Eps_Walking;
 }
 
-void UMyClimbComponent::ForcePlayerOntoWall()
+void UMyClimbComponent::ForcePlayerOntoWall() const
 {
 	if (Player->GetCurrentState() != Eps_Climbing)
 		return;
@@ -168,7 +170,7 @@ void UMyClimbComponent::LookForLedge()
 			bIsClimbingLedge = false;
 		return;
 	}
-	if (!Player->GetIsMidAir() || Player->GetIsUsingHookshot())
+	if (!Player->GetIsMidAir() || Player->GetHookshotComponent()->GetIsUsingHookshot())
 		return; 
  
 	auto World = GetWorld();
@@ -191,7 +193,7 @@ void UMyClimbComponent::LookForLedge()
 		LedgeClimbDestination = HighTraceEnd + FVector(0, 0, Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 		bIsClimbingLedge = true;
 		Player->SetNewAnimation(Ecmm_LedgeClimbing);
-		Player->MovePlayer(LedgeClimbDestination, ClimbData->LedgeClimbDuration);
+		Player->MovePlayer(LedgeClimbDestination, true, ClimbData->LedgeClimbDuration);
 	}
 }
 
@@ -202,7 +204,6 @@ void UMyClimbComponent::BeginPlay()
 	if (!IsValid(Player))
 		Player = Cast<AMyCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 }
-
 
 void UMyClimbComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {

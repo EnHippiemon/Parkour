@@ -7,6 +7,10 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MyCharacter.generated.h"
 
+// SOMETHING IS WRONG WITH CLIMBING ENUM
+// Shows 6 (CLIMBING) when it's supposed to be 0 (walking)
+// and vice versa.
+
 // Add climbing energy:
 // Left click to push yourself and get more energy while climbing.
 // The amount of energy that is restored gets smaller the longer you stay climbing.
@@ -49,6 +53,10 @@
 // - Jumping on pillars
 // - Remove magic numbers to a reasonable extent 
 // - Cinematic camera?
+
+// DELTA TIME?
+// - Double check so that I use delta time with everything happening
+//   over time, such as lerping and +=. 
 
 // Smoother camera:
 // - Make the offset at which the camera attached to the spring arm
@@ -122,6 +130,7 @@ enum ECurrentAnimation : int;
 	class UMyCameraComponent;
 	class UMyMovementModeComponent;
 	class UMyClimbComponent;
+	class UMyHookshotComponent;
 
 // Needs to be UENUM if using Blueprints
 UENUM(BlueprintType)
@@ -155,22 +164,26 @@ public:
 	FOnCanJumpBackChanged OnCanJumpBackChanged;
 	
 	void SetSavedState(EPlayerState NewState) { SavedState = NewState; }
-	void SetNewAnimation(ECurrentAnimation NewMode) { MyAnimationComponent->SetCurrentAnimation(NewMode); }
+	void SetNewAnimation(ECurrentAnimation NewMode) const { MyAnimationComponent->SetCurrentAnimation(NewMode); }
 	
 	UFUNCTION(BlueprintCallable)
 	float GetMovementEnergy() { return MovementEnergy; }
 	float GetSlowMotionTimeDilation() const { return SlowMotionDilation; }
 	bool GetWallIsInFront();
-	bool GetIsUsingHookshot() { return bIsUsingHookshot; }
+	// bool GetIsUsingHookshot() const { return bIsUsingHookshot; }
 
 	FVector GetLocation() const { return GetActorLocation(); }
-	UMyMovementModeComponent* GetMovementModeComponent() { return MyAnimationComponent; }
-	EPlayerState GetCurrentState() { return CurrentState; }
+	UMyMovementModeComponent* GetMovementModeComponent() const { return MyAnimationComponent; }
+	UMyCameraComponent* GetCameraComponent() const { return CameraComponent; }
+	UMyHookshotComponent* GetHookshotComponent() const { return HookshotComponent; }
+	EPlayerState GetCurrentState() const { return CurrentState; }
+	EPlayerState GetSavedState() const { return SavedState; }
 
-	void MovePlayer(const FVector& Destination, float Duration) const;
+	void MovePlayer(const FVector& Destination, const bool EaseInOut, const float Duration);
 	void SetDeceleration(const float Value) const { GetCharacterMovement()->BrakingDecelerationFlying = Value; }
 	void SetMovementMode(const EMovementMode NewMode) const { GetCharacterMovement()->MovementMode = NewMode; }
 	bool GetIsMidAir() const;
+	bool GetIsExhausted() const { return bIsExhausted; }
 
 	ECollisionChannel GetBlockCollision() { return BlockAllCollision; }
 
@@ -182,8 +195,8 @@ private:
 		float SlowMotionDilation = 0.05f;
 		
 	/* Hookshot */ 
-		bool bIsUsingHookshot = false;
-		FVector TargetLocation;
+		// bool bIsUsingHookshot = false;
+		// FVector TargetLocation;
 
 	/* Character Movement */
 		/* Speed */
@@ -241,6 +254,8 @@ private:
 		UMyMovementModeComponent* MyAnimationComponent;
 		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = MovementComponent, meta = (AllowPrivateAccess = "true"))
 		UMyClimbComponent* ClimbComponent;
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = MovementComponent, meta = (AllowPrivateAccess = "true"))
+		UMyHookshotComponent* HookshotComponent;
 
 		/* Data assets */
 			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
@@ -249,10 +264,11 @@ private:
 			UEnergyDataAsset* EnergyData;
 			// UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
 			// UClimbMovementDataAsset* ClimbData;
-			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-			UHookshotDataAsset* HookshotData;
-			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-			UHookshotDataAsset* JumpData;
+			// UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			// UHookshotDataAsset* HookshotData;
+	
+			// UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+			// UHookshotDataAsset* JumpData;
 
 #pragma endregion
 	
