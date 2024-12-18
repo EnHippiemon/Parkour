@@ -4,6 +4,7 @@
 #include "../Characters/MySpringArmComponent.h"
 
 #include "MyCameraComponent.h"
+#include "MyHookshotComponent.h"
 #include "DataAssets/SpringArmDataAsset.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -120,7 +121,7 @@ void UMySpringArmComponent::SetRotationSpeed()
 	if (bShouldRotateFast && RotationSpeed == ArmData->AimingRotationSpeed)
 		return;
 	
-	if (bShouldRotateFast && UGameplayStatics::GetGlobalTimeDilation(GetWorld()) == Player->GetSlowMotionTimeDilation())
+	if (bShouldRotateFast && UGameplayStatics::GetGlobalTimeDilation(GetWorld()) == Player->GetHookshotComponent()->GetSlowMotionTimeDilation())
 		RotationSpeed = ArmData->AimingRotationSpeed;
 	else
 		RotationSpeed = ArmData->StandardRotationSpeed;

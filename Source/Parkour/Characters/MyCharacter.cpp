@@ -4,13 +4,10 @@
 #include "MyMovementModeComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "MyCameraComponent.h"
 #include "MyClimbComponent.h"
 #include "MyHookshotComponent.h"
 #include "DataAssets/GroundMovementDataAsset.h"
 #include "DataAssets/EnergyDataAsset.h"
-#include "DataAssets/HookshotDataAsset.h"
-#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "../FStaticFunctions.h"
@@ -54,23 +51,10 @@ void AMyCharacter::PlayerStateSwitch()
 			MyAnimationComponent->SetCurrentAnimation(Ecmm_Idle);
 			break;
 		case Eps_Aiming:
-			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), SlowMotionDilation);
-			GetCharacterMovement()->bOrientRotationToMovement = false;
-			GetCharacterMovement()->bUseControllerDesiredRotation = true;
-			GetCharacterMovement()->RotationRate = FRotator(0.f, GroundMovementData->AimRotationRate, 0.f);
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_Aiming);
 			break;
 		case Eps_LeaveAiming:
-			GetCharacterMovement()->RotationRate = FRotator(0.f, GroundMovementData->StandardRotationRate, 0.f);
-			GetCharacterMovement()->bOrientRotationToMovement = true;
-			GetCharacterMovement()->bUseControllerDesiredRotation = false;
-			UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.f);
-
 			break;
 		case Eps_Climbing:
-			GetCharacterMovement()->MovementMode = MOVE_Flying;
-			GetCharacterMovement()->bOrientRotationToMovement = false;
-			// MyAnimationComponent->SetCurrentAnimation(Ecmm_Climbing);
 			break;
 		default:
 			UE_LOG(LogTemp, Error, TEXT("No active Player State. Now Walking"))
@@ -219,9 +203,6 @@ void AMyCharacter::CheckFloorAngle()
 
 			TraceDistances.Add(HitResult.Distance);
 			++CurrentTrace;
-
-			// Debug line for illustration in portfolio 
-			// DrawDebugLine(World, StartFloorTrace, TraceEnds, FColor::Red, false, EDrawDebugTrace::ForOneFrame, 0, 1.f);
 		}
 	}
 	
@@ -259,8 +240,13 @@ void AMyCharacter::CheckExhaustion()
 	{
 		MyAnimationComponent->SetCurrentAnimation(Ecmm_Exhausted);
 		bIsExhausted = true;
-		CurrentState = CurrentState == Eps_Aiming ? Eps_LeaveAiming : Eps_Walking;
+		if (CurrentState == Eps_Aiming)
+			CurrentState = Eps_LeaveAiming;
+		else if (CurrentState != Eps_Climbing)
+			CurrentState = Eps_Walking;
 	}
+
+	MovementEnergy = FMath::Clamp(MovementEnergy, 0, 1);
 }
 
 void AMyCharacter::EnergyUsage()
@@ -290,7 +276,7 @@ void AMyCharacter::EnergyUsage()
 		{
 			bCanGainEnergy = false;
 			UsingEnergy = true;
-			MovementLoss = GetWorld()->DeltaTimeSeconds * EnergyData->ExhaustionSpeed * ScaledFloorAngle;			
+			MovementLoss = GetWorld()->DeltaTimeSeconds * EnergyData->RunningDepletionSpeed * ScaledFloorAngle;			
 		}
 		else
 		{
@@ -298,17 +284,22 @@ void AMyCharacter::EnergyUsage()
 			UsingEnergy = false;
 		}
 	}
+	else if (CurrentState == Eps_Climbing)
+	{
+		UsingEnergy = true;
+		MovementLoss = GetWorld()->DeltaTimeSeconds * EnergyData->ClimbingDepletionSpeed;
+	}
 	else
 		UsingEnergy = false;
 
 	if (ScaledFloorAngle < EnergyData->FloorAngleThreshold)
 		bCanGainEnergy = true;
 	
-	if (MovementEnergy < 1.f && !UsingEnergy && bCanGainEnergy)
+	if (MovementEnergy < 1.f && !UsingEnergy && bCanGainEnergy /*&& CurrentState != Eps_Climbing*/)
 		MovementEnergy += GetWorld()->DeltaTimeSeconds * EnergyData->EnergyRegainSpeed;
 	
 	// Decide movement speed
-	if (GetIsMidAir())
+	if (GetIsMidAir() && CurrentState != Eps_Climbing)
 		return;
 	
 	// Flip 0 and 1 so movement speed is increased with higher value. 
@@ -322,26 +313,40 @@ void AMyCharacter::HandleJumpInput()
 	if (bIsExhausted)
 		return;
 	
-	// When running up wall 
-	if (bHasReachedWallWhileSprinting)
+	// Wall jumping + when running up wall
+	if (bHasReachedWallWhileSprinting || bIsSlidingDown)
 	{
-		// Interrupt running
-		FLatentActionManager LatentActionManager = GetWorld()->GetLatentActionManager();
-		LatentActionManager.RemoveActionsForObject(this);
+		FHitResult HitResult;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		
+		constexpr int TraceLength = 100;
+		const FVector TraceStart = GetActorLocation();
+		const FVector TraceEnd = TraceStart + GetActorForwardVector() * TraceLength - GetActorUpVector() * GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		const auto SurfaceTrace = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, BlockAllCollision, Params, FCollisionResponseParams());
+	
+		if (SurfaceTrace)
+		{
+			// Interrupt running
+			FLatentActionManager LatentActionManager = GetWorld()->GetLatentActionManager();
+			LatentActionManager.RemoveActionsForObject(this);
 
-		// Jump in backward direction 
-		SetPlayerVelocity(FVector(0.f, 0.f, GroundMovementData->WallJumpUpVelocity) - GetActorForwardVector() * GroundMovementData->WallJumpBackVelocity);
-		SetActorRotation(FRotator(0, GetActorRotation().Yaw + 180, 0));
-		bHasReachedWallWhileSprinting = false;
-		MyAnimationComponent->SetCurrentAnimation(Ecmm_WallJumping);
-		return;
+			// Jump in backward direction
+			auto WallYawRotation = HitResult.ImpactNormal.Rotation().Yaw;
+
+			SetActorRotation(FRotator(0, WallYawRotation, 0));
+			SetPlayerVelocity(FVector(0.f, 0.f, GroundMovementData->WallJumpUpVelocity) + GetActorForwardVector() * GroundMovementData->WallJumpBackVelocity);
+			bHasReachedWallWhileSprinting = false;
+			MyAnimationComponent->SetCurrentAnimation(Ecmm_WallJumping);
+			return;
+		}
 	}
 
 	// Jump while climbing 
 	if (CurrentState == Eps_Climbing && ClimbComponent->CheckCanClimb())
 	{
 		ClimbComponent->ResetCantClimbTimer();
-		MovementEnergy -= 0.3f;
+		MovementEnergy -= EnergyData->JumpEnergyLoss;
 		GetCharacterMovement()->BrakingDecelerationFlying = 1000.f;
 
 		// Jump backward, straight out from wall 
@@ -362,40 +367,10 @@ void AMyCharacter::HandleJumpInput()
 		return;
 	}
 
-	// Wall jumping
-	constexpr int MinDistanceToGround = 25;
-	const FVector TraceDownStart = GetActorLocation() - GetCapsuleComponent()->GetScaledCapsuleHalfHeight() *
-								   GetActorUpVector() - GetActorForwardVector() * GetCapsuleComponent()->GetScaledCapsuleRadius();
-	const FVector TraceDownEnd = TraceDownStart - GetActorUpVector() * MinDistanceToGround;
-	// DrawDebugLine(GetWorld(), TraceDownStart, TraceDownEnd, FColor::Red, false, 3);
-	FHitResult HitResult;
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
-	const auto TraceDown = GetWorld()->LineTraceSingleByChannel(HitResult, TraceDownStart, TraceDownEnd, BlockAllCollision, Params, FCollisionResponseParams());
-	
-	if (GetCanJumpBackwards() && !TraceDown)
-	{
-		MyAnimationComponent->SetCurrentAnimation(Ecmm_WallJumping);
-
-		if (GetCharacterMovement()->IsMovingOnGround())
-		{
-			if (CurrentState == Eps_Sprinting)
-			{
-				constexpr int SprintCompensationForce = 100;
-				GetCharacterMovement()->AddImpulse(FVector(0.f, 0.f, GroundMovementData->WallJumpUpVelocity * SprintCompensationForce) + CharacterMovement * GroundMovementData->WallJumpBackVelocity * SprintCompensationForce);
-			}
-			else
-				GetCharacterMovement()->AddImpulse(CharacterMovement * GroundMovementData->WallJumpBackVelocity);
-		}
-		else
-			SetPlayerVelocity(FVector(0.f, 0.f, GroundMovementData->WallJumpUpVelocity) + CharacterMovement * GroundMovementData->WallJumpBackVelocity);
-		return;
-	}
-
 	if (GetCharacterMovement()->IsMovingOnGround())
 	{
 		MyAnimationComponent->SetCurrentAnimation(Ecmm_Jumping);
-		MovementEnergy -= 0.3f;
+		MovementEnergy -= EnergyData->JumpEnergyLoss;
 		GetCharacterMovement()->AddImpulse(FVector(0, 0, GroundMovementData->RegularJumpForce));
 	}
 }
@@ -426,9 +401,9 @@ void AMyCharacter::HandleSprintStop()
 	CurrentState = Eps_Walking;
 }
 
-void AMyCharacter::SetMovementSpeed(const float TargetSpeed) const
+void AMyCharacter::SetMovementSpeed(float TargetSpeed) const
 {
-	FMath::Clamp(TargetSpeed, 0, GroundMovementData->MaxSprintSpeed);
+	TargetSpeed = FMath::Clamp(TargetSpeed, 0, GroundMovementData->MaxSprintSpeed);
 	const auto Alpha = TargetSpeed < GetCharacterMovement()->MaxWalkSpeed ? GroundMovementData->ReachTargetDownSpeed : GroundMovementData->ReachTargetUpSpeed;
 
 	GetCharacterMovement()->MaxWalkSpeed = FMath::Lerp(
@@ -487,15 +462,9 @@ void AMyCharacter::CheckShouldStopMovementOverTime()
 	bShouldStopMovementOverTime = true;
 }
 
-void AMyCharacter::SetTimeDilation()
-{
-	if (!GetIsMidAir() && UGameplayStatics::GetGlobalTimeDilation(GetWorld()) < 1)
-		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1);
-}
-
 bool AMyCharacter::GetCanJumpBackwards() const
 {
-	return FloorAngle < GroundMovementData->ThresholdToJumpBack && (GetActorForwardVector() - CharacterMovement).Length() > 1.7f;
+	return FloorAngle < GroundMovementData->ThresholdToJumpBack /*&& (GetActorForwardVector() - CharacterMovement).Length() > 1.7f*/;
 }
 
 void AMyCharacter::MovePlayer(const FVector& Destination, const bool EaseInOut, const float Duration)
@@ -574,6 +543,7 @@ void AMyCharacter::HandleSecondaryActionStop()
 // Look for target to use hookshot on
 void AMyCharacter::HandleActionInput()
 {
+	ClimbComponent->BoostEnergy();
 	CurrentState = HookshotComponent->UseHookshot(this);
 }
 
@@ -581,6 +551,7 @@ void AMyCharacter::RunUpToWall()
 {
 	if (CurrentState != Eps_Sprinting || bHasReachedWallWhileSprinting)
 		return;
+	
 	if (GetVelocity().Z < 0)
 	{
 		bIsNearingWall = false;
@@ -688,9 +659,6 @@ void AMyCharacter::BeginPlay()
 void AMyCharacter::Tick(float const DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	// SWITCH THAT SETS CURRENT STATE? Or rather for loop, probably
-	CurrentState = ClimbComponent->FindClimbableWall();
 	
 	MovementOutput();
 	CheckFloorAngle();
@@ -701,8 +669,7 @@ void AMyCharacter::Tick(float const DeltaTime)
 	EnergyUsage();
 	
 	/* Climbing */
-	// FindClimbableWall();
-	// LookForLedge();
+	CurrentState = ClimbComponent->FindClimbableWall();
 	DecideIfShouldSlide();
 	
 	/* Running */

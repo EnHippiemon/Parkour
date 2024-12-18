@@ -7,11 +7,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MyCharacter.generated.h"
 
-// SOMETHING IS WRONG WITH CLIMBING ENUM
-// Shows 6 (CLIMBING) when it's supposed to be 0 (walking)
-// and vice versa.
+// SLIDING NOT SENSING ALL THE TIME. INCREASE JUMP DISTANCE?
 
-// Add climbing energy:
+// Make wall jumping now need movement input
+
+// DONE. Add climbing energy:
 // Left click to push yourself and get more energy while climbing.
 // The amount of energy that is restored gets smaller the longer you stay climbing.
 // Add a timer, similar to the one on wall behind player check.
@@ -21,7 +21,6 @@
 // depletes faster? And vice versa? 
 
 // After mentoring with Martin:
-//
 // 2:
 // - Create an obstacle course, like a pyramid
 // - Remove unnecessary text in portfolio
@@ -132,7 +131,6 @@ enum ECurrentAnimation : int;
 	class UMyClimbComponent;
 	class UMyHookshotComponent;
 
-// Needs to be UENUM if using Blueprints
 UENUM(BlueprintType)
 enum EPlayerState
 {
@@ -141,7 +139,6 @@ enum EPlayerState
 	Eps_Idle,
 	Eps_Aiming,
 	Eps_LeaveAiming,
-	Eps_UseHookshot,
 	Eps_Climbing
 };
 
@@ -168,9 +165,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	float GetMovementEnergy() { return MovementEnergy; }
-	float GetSlowMotionTimeDilation() const { return SlowMotionDilation; }
 	bool GetWallIsInFront();
-	// bool GetIsUsingHookshot() const { return bIsUsingHookshot; }
 
 	FVector GetLocation() const { return GetActorLocation(); }
 	UMyMovementModeComponent* GetMovementModeComponent() const { return MyAnimationComponent; }
@@ -185,18 +180,11 @@ public:
 	bool GetIsMidAir() const;
 	bool GetIsExhausted() const { return bIsExhausted; }
 
+	void IncreaseEnergy(const float Amount) { MovementEnergy += Amount; }
 	ECollisionChannel GetBlockCollision() { return BlockAllCollision; }
 
 private:
 #pragma region ---------- VARIABLES -----------
-	
-	/* Time dilation */
-		UPROPERTY(EditDefaultsOnly, Category=TimeDilation)
-		float SlowMotionDilation = 0.05f;
-		
-	/* Hookshot */ 
-		// bool bIsUsingHookshot = false;
-		// FVector TargetLocation;
 
 	/* Character Movement */
 		/* Speed */
@@ -262,13 +250,6 @@ private:
 			UGroundMovementDataAsset* GroundMovementData;
 			UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
 			UEnergyDataAsset* EnergyData;
-			// UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-			// UClimbMovementDataAsset* ClimbData;
-			// UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-			// UHookshotDataAsset* HookshotData;
-	
-			// UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-			// UHookshotDataAsset* JumpData;
 
 #pragma endregion
 	
@@ -290,7 +271,6 @@ private:
 			void SetMovementSpeed(const float TargetSpeed) const;
 			void StopMovementOverTime();
 			void CheckShouldStopMovementOverTime();
-			void SetTimeDilation();
 
 		/* Energy */
 			void CheckExhaustion();

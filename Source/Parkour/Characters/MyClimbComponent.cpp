@@ -2,6 +2,7 @@
 
 #include "MyCharacter.h"
 #include "MyHookshotComponent.h"
+#include "DataAssets/EnergyDataAsset.h"
 #include "Components/CapsuleComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "DataAssets/ClimbMovementDataAsset.h"
@@ -15,18 +16,23 @@ UMyClimbComponent::UMyClimbComponent()
 	static ConstructorHelpers::FObjectFinder<UClimbMovementDataAsset> ClimbMovement(TEXT("/Game/Player/DataAssets/ClimbMovementDataAsset"));
 	if (ClimbMovement.Object)
 		ClimbData = ClimbMovement.Object;
+	static ConstructorHelpers::FObjectFinder<UEnergyDataAsset> Energy(TEXT("/Game/Player/DataAssets/EnergyDataAsset"));
+	if (Energy.Object)
+		EnergyData = Energy.Object;
 }
 
 EPlayerState UMyClimbComponent::FindClimbableWall()
 {
 	if (bIsClimbingLedge || Player->GetHookshotComponent()->GetIsUsingHookshot())
 		return Player->GetCurrentState();
+
+	if (Player->GetIsExhausted())
+		return StopClimbing();
 	
 	if (CantClimbTimer < ClimbData->ClimbJumpingTime)
 	{
 		CantClimbTimer += GetWorld()->DeltaTimeSeconds;
 		FindClimbRotation();
-		UE_LOG(LogTemp, Log, TEXT("CurrentState: %d"), Player->GetCurrentState());
 		return Player->GetCurrentState();
 	}
 
@@ -61,14 +67,26 @@ EPlayerState UMyClimbComponent::FindClimbableWall()
 			Player->SetSavedState(Eps_Climbing);
 			return Eps_LeaveAiming;
 		}
-		// GetCharacterMovement()->BrakingDecelerationFlying = FLT_MAX;
+		
 		Player->SetNewAnimation(Ecmm_Climbing);
 		Player->SetDeceleration(FLT_MAX);
 		FindClimbRotation();
 		return Eps_Climbing;
 	}
 	
+	WallPitchRotation = 0;
 	return StopClimbing();
+}
+
+// Interrupt climbing
+EPlayerState UMyClimbComponent::StopClimbing()
+{
+	if (Player->GetCurrentState() != Eps_Climbing)
+		return Player->GetCurrentState();
+	
+	CantClimbTimer = 0.f;
+	Player->SetMovementMode(MOVE_Walking);
+	return Eps_Walking;
 }
 
 void UMyClimbComponent::FindClimbRotation()
@@ -122,7 +140,10 @@ void UMyClimbComponent::FindClimbRotation()
 	}
 
 	if (!WallRotationTrace)
+	{
+		WallPitchRotation = 0;
 		return;
+	}
 	
 	if (bIsJumpingOutFromWall && CurrentClimbingWall == HitResultPlayerRotation.GetActor())
 		return;
@@ -130,6 +151,7 @@ void UMyClimbComponent::FindClimbRotation()
 	// DrawDebugLine(World, StartTraces[i], EndTraces[i], FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 	bIsJumpingOutFromWall = false;
 	CurrentClimbingWall = HitResultPlayerRotation.GetActor();
+	WallPitchRotation = HitResultPlayerRotation.ImpactNormal.Rotation().Pitch;
 	SetPlayerRotation(HitResultPlayerRotation.ImpactNormal.Rotation());
 }
 
@@ -142,15 +164,13 @@ void UMyClimbComponent::SetPlayerRotation(const FRotator& TargetRotation) const
 		ClimbData->RotateToWallSpeed * GetWorld()->DeltaTimeSeconds));
 }
 
-// Interrupt climbing
-EPlayerState UMyClimbComponent::StopClimbing()
+void UMyClimbComponent::BoostEnergy()
 {
 	if (Player->GetCurrentState() != Eps_Climbing)
-		return Player->GetCurrentState();
-	
-	CantClimbTimer = 0.f;
-	Player->SetMovementMode(MOVE_Walking);
-	return Eps_Walking;
+		return;
+
+	const auto BoostAmount = EnergyData->EnergyBoostStartAmount + WallPitchRotation * EnergyData->AmountOfWallPitchToCount;
+	Player->IncreaseEnergy(BoostAmount);
 }
 
 void UMyClimbComponent::ForcePlayerOntoWall() const
@@ -197,12 +217,24 @@ void UMyClimbComponent::LookForLedge()
 	}
 }
 
+void UMyClimbComponent::StateSwitch(const EPlayerState NewState)
+{
+	if (NewState != Eps_Climbing)
+		return;
+
+	Player->SetMovementMode(MOVE_Flying);
+	Player->GetCharacterMovement()->bOrientRotationToMovement = false;
+}
+
 void UMyClimbComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
 	if (!IsValid(Player))
 		Player = Cast<AMyCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+
+	if (IsValid(Player))
+		Player->OnStateChanged.AddUniqueDynamic(this, &UMyClimbComponent::StateSwitch);
 }
 
 void UMyClimbComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

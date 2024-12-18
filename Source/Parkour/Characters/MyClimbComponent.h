@@ -5,6 +5,7 @@
 #include "DataAssets/ClimbMovementDataAsset.h"
 #include "MyClimbComponent.generated.h"
 
+class UEnergyDataAsset;
 class AMyCharacter;
 
 class UClimbMovementDataAsset;
@@ -29,14 +30,16 @@ public:
 	bool IsClimbingLedge() { return bIsClimbingLedge; }
 
 	EPlayerState StopClimbing();
+
+	void BoostEnergy();
 	
 private:
-
 	/* Climb jump */// Impulse or velocity? 
 	float CantClimbTimer = 0.f;
 	bool bIsJumpingOutFromWall;
 	UPROPERTY()
 	AActor* CurrentClimbingWall;
+	double WallPitchRotation;
 
 	/* Ledge climbing */
 	FVector LedgeClimbDestination; 
@@ -55,6 +58,12 @@ private:
 
 	void LookForLedge();
 
+	UFUNCTION()
+	void StateSwitch(EPlayerState NewState);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+	UEnergyDataAsset* EnergyData;
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -62,6 +71,4 @@ protected:
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
-		
 };
