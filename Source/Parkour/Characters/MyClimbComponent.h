@@ -23,11 +23,11 @@ public:
 	
 	EPlayerState FindClimbableWall();
 
-	bool CheckCanClimb() { return CantClimbTimer >= ClimbData->ClimbJumpingTime; }
+	bool CheckCanClimb() const { return CantClimbTimer >= ClimbData->ClimbJumpingTime; }
 	
 	void ResetCantClimbTimer() { CantClimbTimer = 0; }
-	void SetIsJumpingOutFromWall(bool Value) { bIsJumpingOutFromWall = Value; }
-	bool IsClimbingLedge() { return bIsClimbingLedge; }
+	void SetIsJumpingOutFromWall(const bool Value) { bIsJumpingOutFromWall = Value; }
+	bool GetIsClimbingLedge() const { return bIsClimbingLedge; }
 
 	EPlayerState StopClimbing();
 

@@ -70,14 +70,14 @@ void AMyCharacter::PlayerStateSwitch()
 	case Eps_Walking:
 		CheckIdleness();
 		TargetMovementSpeed = GroundMovementData->MaxWalkSpeed * MovementSpeedPercent * MovementEnergy;
-		if (!bIsExhausted && !GetIsMidAir() && !ClimbComponent->IsClimbingLedge())
+		if (!bIsExhausted && !GetIsMidAir() && !ClimbComponent->GetIsClimbingLedge())
 			MyAnimationComponent->SetCurrentAnimation(Ecmm_Walking);
 		break;
 	case Eps_Sprinting:
 		TargetMovementSpeed = GroundMovementData->MaxSprintSpeed * MovementSpeedPercent * MovementEnergy;
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
-		if (!GetIsMidAir() && !bHasReachedWallWhileSprinting && !ClimbComponent->IsClimbingLedge())
+		if (!GetIsMidAir() && !bHasReachedWallWhileSprinting && !ClimbComponent->GetIsClimbingLedge())
 			MyAnimationComponent->SetCurrentAnimation(Ecmm_Sprinting);
 		break;
 	case Eps_Idle:
@@ -107,7 +107,7 @@ void AMyCharacter::PlayerStateSwitch()
 		break;
 	}
 			
-	if (HookshotComponent->GetIsUsingHookshot() || bHasReachedWallWhileSprinting || ClimbComponent->IsClimbingLedge())
+	if (HookshotComponent->GetIsUsingHookshot() || bHasReachedWallWhileSprinting || ClimbComponent->GetIsClimbingLedge())
 		SetPlayerVelocity(FVector(0, 0, 0));
 }
 
@@ -203,6 +203,8 @@ void AMyCharacter::CheckFloorAngle()
 
 			TraceDistances.Add(HitResult.Distance);
 			++CurrentTrace;
+
+			DrawDebugLine(World, StartFloorTrace, TraceEnds, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 		}
 	}
 	
@@ -210,11 +212,12 @@ void AMyCharacter::CheckFloorAngle()
 	FloorAngle = FStaticFunctions::FindSmallestFloat(TraceDistances) * 0.01f;
 }
 
+// Decide if the player should slide down a wall 
 void AMyCharacter::DecideIfShouldSlide()
 {
-	// Decide if the player should slide down a wall 
-	if (FloorAngle < GroundMovementData->ThresholdToJumpBack && GetCharacterMovement()->Velocity.Z < 0.f && !ClimbComponent->IsClimbingLedge() &&
-		!bIsExhausted && CurrentState != Eps_Climbing && CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting)
+	const bool SlideRequirements = GetCanJumpBackwards() && GetCharacterMovement()->Velocity.Z < 0.f && !ClimbComponent->GetIsClimbingLedge() &&
+								   !bIsExhausted && CurrentState != Eps_Climbing && CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting;
+	if (SlideRequirements)
 	{
 		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
 		GetCharacterMovement()->GravityScale = 0.f;
@@ -490,7 +493,7 @@ bool AMyCharacter::GetIsMidAir() const
 void AMyCharacter::CheckIfFalling()
 {
 	if (!bIsSlidingDown && GetCharacterMovement()->Velocity.Z < 0.f && CurrentState != Eps_Climbing && CurrentState != Eps_Aiming &&
-		CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting && !bIsExhausted && !ClimbComponent->IsClimbingLedge())
+		CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting && !bIsExhausted && !ClimbComponent->GetIsClimbingLedge())
 			MyAnimationComponent->SetCurrentAnimation(Ecmm_Jumping);
 }
 
