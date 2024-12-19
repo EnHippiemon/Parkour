@@ -200,12 +200,6 @@ private:
 
 		/* Jumping */
 			/* Climb jump */
-			// ??? Impulse or velocity ??? 
-
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float ClimbJumpOutImpulseUp = 55000.f;
-			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
-			float ClimbJumpOutImpulseBack = 60000.f;
 			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")
 			float VelocityClimbJumpOutUp = 550.f;
 			UPROPERTY(EditDefaultsOnly, Category="Climbing|Jump")

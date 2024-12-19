@@ -203,8 +203,6 @@ void AMyCharacter::CheckFloorAngle()
 
 			TraceDistances.Add(HitResult.Distance);
 			++CurrentTrace;
-
-			DrawDebugLine(World, StartFloorTrace, TraceEnds, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 		}
 	}
 	
@@ -298,7 +296,7 @@ void AMyCharacter::EnergyUsage()
 	if (ScaledFloorAngle < EnergyData->FloorAngleThreshold)
 		bCanGainEnergy = true;
 	
-	if (MovementEnergy < 1.f && !UsingEnergy && bCanGainEnergy /*&& CurrentState != Eps_Climbing*/)
+	if (MovementEnergy < 1.f && !UsingEnergy && bCanGainEnergy)
 		MovementEnergy += GetWorld()->DeltaTimeSeconds * EnergyData->EnergyRegainSpeed;
 	
 	// Decide movement speed
