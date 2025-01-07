@@ -17,7 +17,6 @@ AMyPlayerInput::AMyPlayerInput()
 	
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->bUseControllerDesiredRotation = false;
-	GetCharacterMovement()->AirControl = 0.3f;
 
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;

@@ -119,14 +119,14 @@ void AMyCharacter::MovementOutput()
 		return;
 	}
 	
-	if (CurrentState == Eps_Climbing)
+	if (CurrentState == Eps_Climbing /*&& !ClimbComponent->GetIsJumpingOutFromWall()*/)
 		CharacterMovement = FVector(0.f, GetMovementSideways(), GetMovementForward());
 	else
 		CharacterMovement = FVector(GetMovementForward(), GetMovementSideways(), 0.f);
 	
 	CharacterMovement.Normalize();
 
-	if (CurrentState == Eps_Climbing)
+	if (CurrentState == Eps_Climbing && !ClimbComponent->GetIsJumpingOutFromWall())
 	{
 		// Climb in relation to character's rotation 
 		CharacterMovement = GetActorForwardVector().Rotation().RotateVector(CharacterMovement);
@@ -679,4 +679,6 @@ void AMyCharacter::Tick(float const DeltaTime)
 
 	// Keep last 
 	PlayerStateSwitch();
+
+	// UE_LOG(LogTemp, Log, TEXT("Player state: %i"), CurrentState.GetValue());
 }

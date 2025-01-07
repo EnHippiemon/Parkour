@@ -27,6 +27,7 @@ public:
 	
 	void ResetCantClimbTimer() { CantClimbTimer = 0; }
 	void SetIsJumpingOutFromWall(const bool Value) { bIsJumpingOutFromWall = Value; }
+	bool GetIsJumpingOutFromWall() const { return bIsJumpingOutFromWall; }
 	bool GetIsClimbingLedge() const { return bIsClimbingLedge; }
 
 	EPlayerState StopClimbing();

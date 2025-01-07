@@ -135,6 +135,7 @@ void UMyClimbComponent::FindClimbRotation()
 	for (int i = 0; i < StartTraces.Num(); ++i)
 	{
 		WallRotationTrace = World->LineTraceSingleByChannel(HitResultPlayerRotation, StartTraces[i], EndTraces[i], ClimbData->ClimbingCollision, Parameters, FCollisionResponseParams());
+		// DrawDebugLine(World, StartTraces[i], EndTraces[i], FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 		if (WallRotationTrace)
 			break;
 	}
@@ -144,11 +145,7 @@ void UMyClimbComponent::FindClimbRotation()
 		WallPitchRotation = 0;
 		return;
 	}
-	
-	if (bIsJumpingOutFromWall && CurrentClimbingWall == HitResultPlayerRotation.GetActor())
-		return;
 
-	// DrawDebugLine(World, StartTraces[i], EndTraces[i], FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 	bIsJumpingOutFromWall = false;
 	CurrentClimbingWall = HitResultPlayerRotation.GetActor();
 	WallPitchRotation = HitResultPlayerRotation.ImpactNormal.Rotation().Pitch;
