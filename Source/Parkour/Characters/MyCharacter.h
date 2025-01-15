@@ -119,7 +119,6 @@ enum ECurrentAnimation : int;
 /* Forward Declaration */
 	/* Data Assets */
 	class UHookshotDataAsset;
-	// class UClimbMovementDataAsset;
 	class UGroundMovementDataAsset;
 	class UEnergyDataAsset;
 	class UJumpDataAsset;
