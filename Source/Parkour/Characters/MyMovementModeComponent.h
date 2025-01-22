@@ -6,6 +6,9 @@
 #include "Components/ActorComponent.h"
 #include "MyMovementModeComponent.generated.h"
 
+class AMyCharacter;
+
+UENUM(BlueprintType)
 enum ECurrentAnimation
 {
 	Ecmm_Idle,
@@ -20,10 +23,11 @@ enum ECurrentAnimation
 	Ecmm_Aiming,
 	Ecmm_LeavingAim,
 	Ecmm_Exhausted,
-	Ecmm_SlidingDown
+	Ecmm_SlidingDown,
+	Ecmm_Falling
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNewMovement);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnNewMovement, ECurrentAnimation, NewAnimation);
 
 UCLASS(Blueprintable, BlueprintType, ClassGroup=(My), meta=(BlueprintSpawnableComponent))
 class PARKOUR_API UMyMovementModeComponent : public UActorComponent
@@ -44,6 +48,43 @@ public:
 private:
 	// Movement mode, checks all types of movement and is used for anims etc
 	TEnumAsByte<ECurrentAnimation> MovementMode;
+
+	UPROPERTY()
+	AMyCharacter* Player;
+
+	UPROPERTY()
+	USkeletalMeshComponent* Mesh;
+
+#pragma region --- Animation Sequences ---
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* IdleAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* WalkAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* SprintAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* ClimbingAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* LedgeAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* RunUpWallAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* ClimbJumpAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* WallJumpAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* JumpAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* AimingAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* LeaveAimingAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* ExhaustedAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* SlidingDownAnim;
+	UPROPERTY(EditDefaultsOnly, Category=AnimationSequence)
+	UAnimSequence* FallingAnim;
+#pragma endregion 
 
 #pragma region --- UI Textures ---
 	UPROPERTY()
@@ -75,4 +116,8 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category=UI)
 	UTexture2D* SlidingDownTexture;
 #pragma endregion
+
+	virtual void BeginPlay() override;
+
+	// virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 };

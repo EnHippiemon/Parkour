@@ -167,6 +167,7 @@ public:
 	bool GetWallIsInFront();
 
 	FVector GetLocation() const { return GetActorLocation(); }
+	UFUNCTION(BlueprintCallable)
 	UMyMovementModeComponent* GetMovementModeComponent() const { return MyAnimationComponent; }
 	UMyCameraComponent* GetCameraComponent() const { return CameraComponent; }
 	UMyHookshotComponent* GetHookshotComponent() const { return HookshotComponent; }

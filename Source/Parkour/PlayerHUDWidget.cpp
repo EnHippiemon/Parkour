@@ -11,11 +11,11 @@ void UPlayerHUDWidget::NativeConstruct()
 	
 	Player = Cast<AMyCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 
-	if (IsValid(Player))
-	{
-		if (IsValid(Player->GetMovementModeComponent()))
-			Player->GetMovementModeComponent()->OnNewMovement.AddUniqueDynamic(this, &UPlayerHUDWidget::UpdateMovementImage);
-	}
+	// if (IsValid(Player))
+	// {
+	// 	if (IsValid(Player->GetMovementModeComponent()))
+	// 		Player->GetMovementModeComponent()->OnNewMovement.AddUniqueDynamic(this, &UPlayerHUDWidget::UpdateMovementImage);
+	// }
 }
 
 float UPlayerHUDWidget::CalculateEnergyPercentage()

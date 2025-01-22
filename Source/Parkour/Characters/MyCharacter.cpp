@@ -71,7 +71,7 @@ void AMyCharacter::PlayerStateSwitch()
 		CheckIdleness();
 		TargetMovementSpeed = GroundMovementData->MaxWalkSpeed * MovementSpeedPercent * MovementEnergy;
 		if (!bIsExhausted && !GetIsMidAir() && !ClimbComponent->GetIsClimbingLedge())
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_Walking);
+			MyAnimationComponent->SetCurrentAnimation(GetCharacterMovement()->Velocity.Length() > 0 ? Ecmm_Walking : Ecmm_Idle);
 		break;
 	case Eps_Sprinting:
 		TargetMovementSpeed = GroundMovementData->MaxSprintSpeed * MovementSpeedPercent * MovementEnergy;
@@ -492,7 +492,7 @@ void AMyCharacter::CheckIfFalling()
 {
 	if (!bIsSlidingDown && GetCharacterMovement()->Velocity.Z < 0.f && CurrentState != Eps_Climbing && CurrentState != Eps_Aiming &&
 		CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting && !bIsExhausted && !ClimbComponent->GetIsClimbingLedge())
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_Jumping);
+			MyAnimationComponent->SetCurrentAnimation(Ecmm_Falling);
 }
 
 // Interrupt climbing
