@@ -51,8 +51,10 @@ void AMyCharacter::PlayerStateSwitch()
 			MyAnimationComponent->SetCurrentAnimation(Ecmm_Idle);
 			break;
 		case Eps_Aiming:
+			OnAim.Broadcast();
 			break;
 		case Eps_LeaveAiming:
+			OnStopAim.Broadcast();
 			break;
 		case Eps_Climbing:
 			break;

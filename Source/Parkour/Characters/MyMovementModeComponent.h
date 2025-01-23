@@ -27,7 +27,7 @@ enum ECurrentAnimation
 	Ecmm_Falling
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnNewMovement, ECurrentAnimation, NewAnimation);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNewMovement);
 
 UCLASS(Blueprintable, BlueprintType, ClassGroup=(My), meta=(BlueprintSpawnableComponent))
 class PARKOUR_API UMyMovementModeComponent : public UActorComponent
@@ -118,6 +118,4 @@ private:
 #pragma endregion
 
 	virtual void BeginPlay() override;
-
-	// virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 };

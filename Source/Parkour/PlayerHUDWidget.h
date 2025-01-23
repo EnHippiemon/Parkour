@@ -21,12 +21,19 @@ private:
 
 	UFUNCTION()
 	void UpdateMovementImage();
+	UFUNCTION()
+	void ActivateCrosshair();
+	UFUNCTION()
+	void DeactivateCrosshair();
 
 	UPROPERTY(VisibleAnywhere)
 	AMyCharacter* Player;
 
 	UPROPERTY(meta = (BindWidget), EditDefaultsOnly)
 	UImage* MovementImage;
+
+	UPROPERTY(meta = (BindWidget), EditDefaultsOnly)
+	UImage* CrosshairImage;
 
 	UPROPERTY(EditDefaultsOnly)
 	FVector2D ImageOffset = FVector2D(-10, 0);

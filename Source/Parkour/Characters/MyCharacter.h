@@ -142,6 +142,8 @@ enum EPlayerState
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPlayerState, NewState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAim);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStopAim);
 
 // DELETE THIS?
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCanJumpBackChanged, bool, CanJumpBack);
@@ -158,6 +160,10 @@ public:
 	FOnStateChanged OnStateChanged;
 	UPROPERTY(BlueprintAssignable)
 	FOnCanJumpBackChanged OnCanJumpBackChanged;
+	UPROPERTY(BlueprintAssignable)
+	FOnAim OnAim;
+	UPROPERTY(BlueprintAssignable)
+	FOnStopAim OnStopAim;
 	
 	void SetSavedState(EPlayerState NewState) { SavedState = NewState; }
 	void SetNewAnimation(ECurrentAnimation NewMode) const { MyAnimationComponent->SetCurrentAnimation(NewMode); }

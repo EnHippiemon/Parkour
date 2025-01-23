@@ -76,6 +76,7 @@ void UMyMovementModeComponent::SetCurrentAnimation(ECurrentAnimation Movement)
 			break;
 		case Ecmm_Falling:
 			Mesh->PlayAnimation(FallingAnim, true);
+			CurrentMovementTexture = JumpTexture;
 			break;
 		default:
 			Mesh->PlayAnimation(IdleAnim, true);
@@ -83,7 +84,7 @@ void UMyMovementModeComponent::SetCurrentAnimation(ECurrentAnimation Movement)
 		}
 	}
 	
-	OnNewMovement.Broadcast(Movement);
+	OnNewMovement.Broadcast();
 }
 
 void UMyMovementModeComponent::BeginPlay()
@@ -97,15 +98,3 @@ void UMyMovementModeComponent::BeginPlay()
 
 	Mesh = Player->FindComponentByClass<USkeletalMeshComponent>();
 }
-
-// void UMyMovementModeComponent::TickComponent(float DeltaTime, ELevelTick TickType,
-// 	FActorComponentTickFunction* ThisTickFunction)
-// {
-// 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-//
-// 	if (MovementMode == Ecmm_Walking)
-// 	{
-// 		const auto PlayerSpeed = Player->GetCharacterMovement()->MaxWalkSpeed;
-// 		Mesh->PlayAnimation(PlayerSpeed > 0 ? WalkAnim : IdleAnim, true);
-// 	}
-// }
