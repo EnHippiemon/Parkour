@@ -22,59 +22,59 @@ void UMyMovementModeComponent::SetCurrentAnimation(ECurrentAnimation Movement)
 	{
 		switch (MovementMode)
 		{
-		case Ecmm_Idle:
+		case Eca_Idle:
 			Mesh->PlayAnimation(IdleAnim, true);
 			CurrentMovementTexture = IdleTexture;
 			break;
-		case Ecmm_Walking:
+		case Eca_Walking:
 			Mesh->PlayAnimation(WalkAnim, true);
 			CurrentMovementTexture = WalkingTexture;
 			break;
-		case Ecmm_Sprinting:
+		case Eca_Sprinting:
 			Mesh->PlayAnimation(SprintAnim, true);
 			CurrentMovementTexture = RunningTexture;
 			break;
-		case Ecmm_Climbing:
+		case Eca_Climbing:
 			Mesh->PlayAnimation(ClimbingAnim, true);
 			CurrentMovementTexture = ClimbingTexture;
 			break;
-		case Ecmm_LedgeClimbing:
+		case Eca_LedgeClimbing:
 			Mesh->PlayAnimation(LedgeAnim, false);
 			CurrentMovementTexture = LedgeClimbingTexture;
 			break;
-		case Ecmm_Jumping:
+		case Eca_Jumping:
 			Mesh->PlayAnimation(JumpAnim, false);
 			CurrentMovementTexture = JumpTexture;
 			break;
-		case Ecmm_ClimbJumping:
+		case Eca_ClimbJumping:
 			Mesh->PlayAnimation(ClimbJumpAnim, false);
 			CurrentMovementTexture = ClimbJumpTexture;
 			break;
-		case Ecmm_RunningUpWall:
+		case Eca_RunningUpWall:
 			Mesh->PlayAnimation(RunUpWallAnim, true);
 			CurrentMovementTexture = RunUpWallTexture;
 			break;
-		case Ecmm_WallJumping:
+		case Eca_WallJumping:
 			Mesh->PlayAnimation(WallJumpAnim, true);
 			CurrentMovementTexture = WallJumpTexture;
 			break;
-		case Ecmm_Aiming:
+		case Eca_Aiming:
 			Mesh->PlayAnimation(AimingAnim, true);
 			CurrentMovementTexture = AimingTexture;
 			break;
-		case Ecmm_LeavingAim:
+		case Eca_LeavingAim:
 			Mesh->PlayAnimation(LeaveAimingAnim, true);
 			CurrentMovementTexture = LeaveAimingTexture;
 			break;
-		case Ecmm_Exhausted:
+		case Eca_Exhausted:
 			Mesh->PlayAnimation(ExhaustedAnim, true);
 			CurrentMovementTexture = ExhaustedTexture;
 			break;
-		case Ecmm_SlidingDown:
+		case Eca_SlidingDown:
 			Mesh->PlayAnimation(SlidingDownAnim, true);
 			CurrentMovementTexture = SlidingDownTexture;
 			break;
-		case Ecmm_Falling:
+		case Eca_Falling:
 			Mesh->PlayAnimation(FallingAnim, true);
 			CurrentMovementTexture = JumpTexture;
 			break;

@@ -11,20 +11,20 @@ class AMyCharacter;
 UENUM(BlueprintType)
 enum ECurrentAnimation
 {
-	Ecmm_Idle,
-	Ecmm_Walking,
-	Ecmm_Sprinting,
-	Ecmm_Climbing,
-	Ecmm_LedgeClimbing,
-	Ecmm_Jumping,
-	Ecmm_ClimbJumping,
-	Ecmm_RunningUpWall,
-	Ecmm_WallJumping,
-	Ecmm_Aiming,
-	Ecmm_LeavingAim,
-	Ecmm_Exhausted,
-	Ecmm_SlidingDown,
-	Ecmm_Falling
+	Eca_Idle,
+	Eca_Walking,
+	Eca_Sprinting,
+	Eca_Climbing,
+	Eca_LedgeClimbing,
+	Eca_Jumping,
+	Eca_ClimbJumping,
+	Eca_RunningUpWall,
+	Eca_WallJumping,
+	Eca_Aiming,
+	Eca_LeavingAim,
+	Eca_Exhausted,
+	Eca_SlidingDown,
+	Eca_Falling
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNewMovement);

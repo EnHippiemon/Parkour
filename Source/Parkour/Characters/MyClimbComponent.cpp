@@ -70,7 +70,7 @@ EPlayerState UMyClimbComponent::FindClimbableWall()
 			return Eps_LeaveAiming;
 		}
 		
-		Player->SetNewAnimation(Ecmm_Climbing);
+		Player->SetNewAnimation(Eca_Climbing);
 		Player->SetDeceleration(FLT_MAX);
 		FindClimbRotation();
 		return Eps_Climbing;
@@ -211,7 +211,7 @@ void UMyClimbComponent::LookForLedge()
 	{
 		LedgeClimbDestination = HighTraceEnd + FVector(0, 0, Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 		bIsClimbingLedge = true;
-		Player->SetNewAnimation(Ecmm_LedgeClimbing);
+		Player->SetNewAnimation(Eca_LedgeClimbing);
 		Player->MovePlayer(LedgeClimbDestination, true, ClimbData->LedgeClimbDuration);
 	}
 }

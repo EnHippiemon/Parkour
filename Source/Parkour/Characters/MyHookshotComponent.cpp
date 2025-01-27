@@ -68,9 +68,9 @@ EPlayerState UMyHookshotComponent::LeaveAiming(const AMyCharacter* ThisPlayer)
 void UMyHookshotComponent::SetAnimation(const AMyCharacter* ThisPlayer) const
 {
 	if (bIsUsingHookshot)
-		ThisPlayer->SetNewAnimation(Ecmm_LeavingAim);
+		ThisPlayer->SetNewAnimation(Eca_LeavingAim);
 	else if (ThisPlayer->GetIsMidAir() && !ThisPlayer->GetIsExhausted())
-		ThisPlayer->SetNewAnimation(Ecmm_Jumping);
+		ThisPlayer->SetNewAnimation(Eca_Jumping);
 }
 
 void UMyHookshotComponent::StateSwitch(const EPlayerState NewState)
@@ -81,7 +81,7 @@ void UMyHookshotComponent::StateSwitch(const EPlayerState NewState)
 		Player->GetCharacterMovement()->bOrientRotationToMovement = false;
 		Player->GetCharacterMovement()->bUseControllerDesiredRotation = true;
 		Player->GetCharacterMovement()->RotationRate = FRotator(0.f, GroundMovementData->AimRotationRate, 0.f);
-		Player->SetNewAnimation(Ecmm_Aiming);
+		Player->SetNewAnimation(Eca_Aiming);
 	}
 	else if (NewState == Eps_LeaveAiming)
 	{

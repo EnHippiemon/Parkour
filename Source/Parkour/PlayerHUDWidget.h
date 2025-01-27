@@ -31,7 +31,6 @@ private:
 
 	UPROPERTY(meta = (BindWidget), EditDefaultsOnly)
 	UImage* MovementImage;
-
 	UPROPERTY(meta = (BindWidget), EditDefaultsOnly)
 	UImage* CrosshairImage;
 

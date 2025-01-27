@@ -48,7 +48,7 @@ void AMyCharacter::PlayerStateSwitch()
 			GetCharacterMovement()->SetWalkableFloorAngle(90.f);
 			break;
 		case Eps_Idle:
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_Idle);
+			MyAnimationComponent->SetCurrentAnimation(Eca_Idle);
 			break;
 		case Eps_Aiming:
 			OnAim.Broadcast();
@@ -73,14 +73,14 @@ void AMyCharacter::PlayerStateSwitch()
 		CheckIdleness();
 		TargetMovementSpeed = GroundMovementData->MaxWalkSpeed * MovementSpeedPercent * MovementEnergy;
 		if (!bIsExhausted && !GetIsMidAir() && !ClimbComponent->GetIsClimbingLedge())
-			MyAnimationComponent->SetCurrentAnimation(GetCharacterMovement()->Velocity.Length() > 0 ? Ecmm_Walking : Ecmm_Idle);
+			MyAnimationComponent->SetCurrentAnimation(GetCharacterMovement()->Velocity.Length() > 0 ? Eca_Walking : Eca_Idle);
 		break;
 	case Eps_Sprinting:
 		TargetMovementSpeed = GroundMovementData->MaxSprintSpeed * MovementSpeedPercent * MovementEnergy;
 		if (GetCharacterMovement()->Velocity.Length() < 0.1f)
 			HandleSprintStop();
 		if (!GetIsMidAir() && !bHasReachedWallWhileSprinting && !ClimbComponent->GetIsClimbingLedge())
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_Sprinting);
+			MyAnimationComponent->SetCurrentAnimation(Eca_Sprinting);
 		break;
 	case Eps_Idle:
 		CheckIdleness();
@@ -223,7 +223,7 @@ void AMyCharacter::DecideIfShouldSlide()
 		SetPlayerVelocity(FVector(0.f, 0.f, -250.f));
 		GetCharacterMovement()->GravityScale = 0.f;
 		bIsSlidingDown = true;
-		MyAnimationComponent->SetCurrentAnimation(Ecmm_SlidingDown);
+		MyAnimationComponent->SetCurrentAnimation(Eca_SlidingDown);
 	}
 	else
 	{
@@ -236,13 +236,13 @@ void AMyCharacter::CheckExhaustion()
 {
 	if (MovementEnergy >= 1.f && bIsExhausted)
 	{
-		MyAnimationComponent->SetCurrentAnimation(Ecmm_Walking);
+		MyAnimationComponent->SetCurrentAnimation(Eca_Walking);
 		bIsExhausted = false;
 	}
 	
 	if (MovementEnergy <= 0.f && !bIsExhausted)
 	{
-		MyAnimationComponent->SetCurrentAnimation(Ecmm_Exhausted);
+		MyAnimationComponent->SetCurrentAnimation(Eca_Exhausted);
 		bIsExhausted = true;
 		if (CurrentState == Eps_Aiming)
 			CurrentState = Eps_LeaveAiming;
@@ -338,7 +338,7 @@ void AMyCharacter::HandleJumpInput()
 			SetActorRotation(FRotator(0, WallYawRotation, 0));
 			SetPlayerVelocity(FVector(0.f, 0.f, GroundMovementData->WallJumpUpVelocity) + GetActorForwardVector() * GroundMovementData->WallJumpBackVelocity);
 			bHasReachedWallWhileSprinting = false;
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_WallJumping);
+			MyAnimationComponent->SetCurrentAnimation(Eca_WallJumping);
 			return;
 		}
 	}
@@ -355,13 +355,13 @@ void AMyCharacter::HandleJumpInput()
 		{
 			constexpr int RotationCorrection = 180;
 			ClimbComponent->SetIsJumpingOutFromWall(true);
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_WallJumping);
+			MyAnimationComponent->SetCurrentAnimation(Eca_WallJumping);
 			SetPlayerVelocity(FVector(0.f, 0.f, VelocityClimbJumpOutUp) - GetActorForwardVector() * VelocityClimbJumpOutBack);
 			SetActorRotation(FRotator(0, GetActorRotation().Yaw + RotationCorrection, 0));
 			return;
 		}
 
-		MyAnimationComponent->SetCurrentAnimation(Ecmm_ClimbJumping);
+		MyAnimationComponent->SetCurrentAnimation(Eca_ClimbJumping);
 		
 		// Jump in direction of movement input 
 		SetPlayerVelocity(CharacterMovement * GroundMovementData->WallJumpUpVelocity);
@@ -370,7 +370,7 @@ void AMyCharacter::HandleJumpInput()
 
 	if (GetCharacterMovement()->IsMovingOnGround())
 	{
-		MyAnimationComponent->SetCurrentAnimation(Ecmm_Jumping);
+		MyAnimationComponent->SetCurrentAnimation(Eca_Jumping);
 		MovementEnergy -= EnergyData->JumpEnergyLoss;
 		GetCharacterMovement()->AddImpulse(FVector(0, 0, GroundMovementData->RegularJumpForce));
 	}
@@ -381,7 +381,7 @@ void AMyCharacter::Landed(const FHitResult& Hit)
 	Super::Super::Landed(Hit);
 
 	if (!bIsExhausted)
-		MyAnimationComponent->SetCurrentAnimation(CurrentState == Eps_Sprinting ? Ecmm_Sprinting : Ecmm_Walking);
+		MyAnimationComponent->SetCurrentAnimation(CurrentState == Eps_Sprinting ? Eca_Sprinting : Eca_Walking);
 	
 	bHasReachedWallWhileSprinting = false;
 }
@@ -492,7 +492,7 @@ void AMyCharacter::CheckIfFalling() const
 {
 	if (!bIsSlidingDown && GetCharacterMovement()->Velocity.Z < 0.f && CurrentState != Eps_Climbing && CurrentState != Eps_Aiming &&
 		CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting && !bIsExhausted && !ClimbComponent->GetIsClimbingLedge())
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_Falling);
+			MyAnimationComponent->SetCurrentAnimation(Eca_Falling);
 }
 
 // Interrupt climbing
@@ -619,7 +619,7 @@ void AMyCharacter::RunUpToWall()
 		{
 			bHasReachedWallWhileSprinting = true;
 			bIsNearingWall = false;
-			MyAnimationComponent->SetCurrentAnimation(Ecmm_RunningUpWall);
+			MyAnimationComponent->SetCurrentAnimation(Eca_RunningUpWall);
 			UKismetSystemLibrary::MoveComponentTo(
 				RootComponent,
 				RunningUpWallEndLocation,
@@ -649,7 +649,7 @@ void AMyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	MyAnimationComponent->SetCurrentAnimation(Ecmm_Walking);
+	MyAnimationComponent->SetCurrentAnimation(Eca_Walking);
 
 	if (!GroundMovementData || !EnergyData)
 		UE_LOG(LogTemp, Error, TEXT("MyCharacter.cpp - Data Asset missing!"))
