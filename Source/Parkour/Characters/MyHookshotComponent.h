@@ -7,6 +7,7 @@
 enum EPlayerState : int;
 
 class AMyCharacter;
+
 class UHookshotDataAsset;
 class UGroundMovementDataAsset;
 
@@ -30,26 +31,21 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category=TimeDilation)
 	float SlowMotionDilation = 0.05f;
-
-
+	
 	void SetAnimation(const AMyCharacter* ThisPlayer) const;
 
 	UFUNCTION()
 	void StateSwitch(EPlayerState NewState);
-	void SetTimeDilation();
+	void SetTimeDilation() const;
 
 	UPROPERTY()
 	AMyCharacter* Player;
 
 	/* Data assets */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-	UHookshotDataAsset* HookshotData;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-	UGroundMovementDataAsset* GroundMovementData;
+		UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UHookshotDataAsset* HookshotData;
+		UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UGroundMovementDataAsset* GroundMovementData;
 	
-protected:
 	virtual void BeginPlay() override;
-
-public:	
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 };

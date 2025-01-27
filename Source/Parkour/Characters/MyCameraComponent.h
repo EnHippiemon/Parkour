@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-// #include "../Characters/MyCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/DataAsset.h"
 #include "MyCameraComponent.generated.h"

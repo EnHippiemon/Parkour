@@ -22,8 +22,8 @@ public:
 	UMyCameraComponent* GetCamera() const { return CameraComponent; }
 
 	/* Basic character movement */
-	float GetMovementForward() const { return CharacterMovementForward; }
-	float GetMovementSideways() const { return CharacterMovementSideways; }
+		float GetMovementForward() const { return CharacterMovementForward; }
+		float GetMovementSideways() const { return CharacterMovementSideways; }
 	
 protected:
 	/* ---------- VARIABLES ----------- */
@@ -33,7 +33,7 @@ protected:
 	
 	/* Movement without input */
 		FLatentActionInfo LatentActionInfo;
-
+	
 
 	/* ---------- FUNCTIONS ----------- */
 	

@@ -5,9 +5,9 @@
 #include "DataAssets/ClimbMovementDataAsset.h"
 #include "MyClimbComponent.generated.h"
 
-class UEnergyDataAsset;
 class AMyCharacter;
 
+class UEnergyDataAsset;
 class UClimbMovementDataAsset;
 
 enum EPlayerState;
@@ -18,7 +18,6 @@ class PARKOUR_API UMyClimbComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:	
-	// Sets default values for this component's properties
 	UMyClimbComponent();
 	
 	EPlayerState FindClimbableWall();
@@ -35,41 +34,36 @@ public:
 	void BoostEnergy();
 	
 private:
-	/* Climb jump */// Impulse or velocity? 
-	float CantClimbTimer = 0.f;
-	bool bIsJumpingOutFromWall;
-	UPROPERTY()
-	AActor* CurrentClimbingWall;
-	double WallPitchRotation;
+	/* Climb jump */ 
+		float CantClimbTimer = 0.f;
+		bool bIsJumpingOutFromWall;
+		UPROPERTY()
+		AActor* CurrentClimbingWall;
+		double WallPitchRotation;
 
 	/* Ledge climbing */
-	FVector LedgeClimbDestination; 
-	bool bIsClimbingLedge = false;
-	
-	UPROPERTY()
-	AMyCharacter* Player;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-	UClimbMovementDataAsset* ClimbData;
+		FVector LedgeClimbDestination; 
+		bool bIsClimbingLedge = false;
+		
+		UPROPERTY()
+		AMyCharacter* Player;
+		UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UClimbMovementDataAsset* ClimbData;
 	
 	/* Climbing */
-	void FindClimbRotation();
-	void SetPlayerRotation(const FRotator& TargetRotation) const;
+		void FindClimbRotation();
+		void SetPlayerRotation(const FRotator& TargetRotation) const;
 
-	void ForcePlayerOntoWall() const;
+		void ForcePlayerOntoWall() const;
 
-	void LookForLedge();
+		void LookForLedge();
 
-	UFUNCTION()
-	void StateSwitch(EPlayerState NewState);
+		UFUNCTION()
+		void StateSwitch(EPlayerState NewState);
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
-	UEnergyDataAsset* EnergyData;
+		UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataAsset, meta = (AllowPrivateAccess = "true"))
+		UEnergyDataAsset* EnergyData;
 
-protected:
-	// Called when the game starts
 	virtual void BeginPlay() override;
-
-public:	
-	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 };

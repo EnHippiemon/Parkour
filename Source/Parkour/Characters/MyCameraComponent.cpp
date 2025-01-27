@@ -54,9 +54,6 @@ void UMyCameraComponent::TickStateSwitch()
 	default:
 		break;
 	}
-	
-	if (CurrentState != Eps_Idle)
-		FieldOfView = FMath::Lerp(FieldOfView, CameraData->WalkingFOV, 0.001f * DeltaTime);
 }
 
 void UMyCameraComponent::BeginPlay()

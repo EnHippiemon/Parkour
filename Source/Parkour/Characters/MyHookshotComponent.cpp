@@ -92,7 +92,7 @@ void UMyHookshotComponent::StateSwitch(const EPlayerState NewState)
 	}
 }
 
-void UMyHookshotComponent::SetTimeDilation()
+void UMyHookshotComponent::SetTimeDilation() const
 {
 	if (!Player->GetIsMidAir() && UGameplayStatics::GetGlobalTimeDilation(GetWorld()) < 1)
 		UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1);
@@ -108,9 +108,4 @@ void UMyHookshotComponent::BeginPlay()
 
 	if (IsValid(Player))
 		Player->OnStateChanged.AddUniqueDynamic(this, &UMyHookshotComponent::StateSwitch);
-}
-
-void UMyHookshotComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }

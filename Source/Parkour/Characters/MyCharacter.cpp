@@ -28,7 +28,7 @@ AMyCharacter::AMyCharacter()
 		EnergyData = Energy.Object;
 }
 
-bool AMyCharacter::GetWallIsInFront()
+bool AMyCharacter::GetWallIsInFront() const
 {
 	return FloorAngle > GroundMovementData->ThresholdToJumpBack;
 }
@@ -121,7 +121,7 @@ void AMyCharacter::MovementOutput()
 		return;
 	}
 	
-	if (CurrentState == Eps_Climbing /*&& !ClimbComponent->GetIsJumpingOutFromWall()*/)
+	if (CurrentState == Eps_Climbing)
 		CharacterMovement = FVector(0.f, GetMovementSideways(), GetMovementForward());
 	else
 		CharacterMovement = FVector(GetMovementForward(), GetMovementSideways(), 0.f);
@@ -158,7 +158,6 @@ void AMyCharacter::MovementOutput()
 		SetMovementSpeed(TargetMovementSpeed);
 		AddMovementInput(CharacterMovement);
 	}
-	// UE_LOG(LogTemp, Log, TEXT("Movement: %f"), GetCharacterMovement()->MaxWalkSpeed);
 }
 
 void AMyCharacter::SetPlayerVelocity(const FVector& Value) const
@@ -180,9 +179,11 @@ void AMyCharacter::CheckFloorAngle()
 
 	constexpr int TraceSeparation = 20;
 	int WidestPossibleTrace = 130;
+	
 	// Increase the width to prevent zig zag cheating. 
 	if (!bCanGainEnergy)
 		WidestPossibleTrace = 300;
+	
 	TArray<float> TraceDistances;
 
 	FCollisionQueryParams Parameters;
@@ -260,8 +261,6 @@ void AMyCharacter::EnergyUsage()
 	const auto ScaledFloorAngle = UKismetMathLibrary::NormalizeToRange(CorrectedFloorAngle, 0, 0.4f);
 	bool UsingEnergy;
 	
-	// UE_LOG(LogTemp, Warning, TEXT("Corrected floor: %f | Scaled floor: %f | Floor angle: %f"), CorrectedFloorAngle, ScaledFloorAngle, FloorAngle);
-	
 	if (CurrentState == Eps_Sprinting)
 	{
 		// Checking if on ground
@@ -269,7 +268,6 @@ void AMyCharacter::EnergyUsage()
 		const FVector TraceDownStart = GetActorLocation() - GetCapsuleComponent()->GetScaledCapsuleHalfHeight() *
 									   GetActorUpVector() - GetActorForwardVector() * GetCapsuleComponent()->GetScaledCapsuleRadius();
 		const FVector TraceDownEnd = TraceDownStart - GetActorUpVector() * MinDistanceToGround;
-		// DrawDebugLine(GetWorld(), TraceDownStart, TraceDownEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 		FHitResult HitResult;
 		FCollisionQueryParams Params;
 		Params.AddIgnoredActor(this);
@@ -490,7 +488,7 @@ bool AMyCharacter::GetIsMidAir() const
 	return GetCharacterMovement()->Velocity.Z == 0 ? 0 : 1;
 }
 
-void AMyCharacter::CheckIfFalling()
+void AMyCharacter::CheckIfFalling() const
 {
 	if (!bIsSlidingDown && GetCharacterMovement()->Velocity.Z < 0.f && CurrentState != Eps_Climbing && CurrentState != Eps_Aiming &&
 		CurrentState != Eps_LeaveAiming && !bHasReachedWallWhileSprinting && !bIsExhausted && !ClimbComponent->GetIsClimbingLedge())
@@ -576,8 +574,6 @@ void AMyCharacter::RunUpToWall()
 		FoundWall = DistancedLookForWallHitResult.GetActor();
 	}
 	
-	// DrawDebugLine(GetWorld(), TraceStart, DistancedLookForWallEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame, 0, 1);
-
 	if (!DistancedLookForWall)
 		bIsNearingWall = false;
 	
@@ -662,25 +658,23 @@ void AMyCharacter::BeginPlay()
 void AMyCharacter::Tick(float const DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	/* Floor and air movement */
+		MovementOutput();
+		CheckFloorAngle();
+		CheckIfFalling();
 	
-	MovementOutput();
-	CheckFloorAngle();
-	CheckIfFalling();
+		/* Running */
+			RunUpToWall();
+			RunningUpWall();
 
 	/* Energy */
-	CheckExhaustion();
-	EnergyUsage();
-	
-	/* Climbing */
-	CurrentState = ClimbComponent->FindClimbableWall();
-	DecideIfShouldSlide();
-	
-	/* Running */
-	RunUpToWall();
-	RunningUpWall();
+		CheckExhaustion();
+		EnergyUsage();
+		
+		/* Climbing */
+		CurrentState = ClimbComponent->FindClimbableWall();
+		DecideIfShouldSlide();
 
-	// Keep last 
 	PlayerStateSwitch();
-
-	// UE_LOG(LogTemp, Log, TEXT("Player state: %i"), CurrentState.GetValue());
 }

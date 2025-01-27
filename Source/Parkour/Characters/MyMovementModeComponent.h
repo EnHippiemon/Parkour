@@ -35,13 +35,12 @@ class PARKOUR_API UMyMovementModeComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:	
-	// Sets default values for this component's properties
 	UMyMovementModeComponent();
 	
 	UPROPERTY(BlueprintAssignable)
 	FOnNewMovement OnNewMovement;
 
-	UTexture2D* GetCurrentMovementTexture() { return CurrentMovementTexture; }
+	UTexture2D* GetCurrentMovementTexture() const { return CurrentMovementTexture; }
 
 	void SetCurrentAnimation(ECurrentAnimation Movement);
 	

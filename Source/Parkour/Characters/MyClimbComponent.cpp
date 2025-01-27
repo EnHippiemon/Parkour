@@ -36,6 +36,7 @@ EPlayerState UMyClimbComponent::FindClimbableWall()
 		return Player->GetCurrentState();
 	}
 
+#pragma region -- LINE TRACES -- 
 	const auto World = GetWorld();
 	const auto ActorLocation = Player->GetActorLocation();
 	const auto ForwardVector = Player->GetActorForwardVector();
@@ -56,7 +57,8 @@ EPlayerState UMyClimbComponent::FindClimbableWall()
 	const auto ForwardTrace = World->LineTraceSingleByChannel(HitResultForward, StartWallAngle, EndForwardAngle, ClimbData->ClimbingCollision, Parameters, FCollisionResponseParams());
 	const auto RightTrace = World->LineTraceSingleByChannel(HitResultRight, StartWallAngle, EndRightAngle, ClimbData->ClimbingCollision, Parameters, FCollisionResponseParams());
 	const auto LeftTrace = World->LineTraceSingleByChannel(HitResultLeft, StartWallAngle, EndLeftAngle, ClimbData->ClimbingCollision, Parameters, FCollisionResponseParams());
-
+#pragma endregion
+	
 	// Check if two LineTraces find a climbing wall. 
 	if (ForwardTrace && RightTrace ||
 		ForwardTrace && LeftTrace ||
@@ -108,7 +110,7 @@ void UMyClimbComponent::FindClimbRotation()
 	TArray<FVector> StartTraces;
 	TArray<FVector> EndTraces;
 
-#pragma region Vectors
+#pragma region -- VECTORS --
 	const FVector StartBackWallDetection = ActorLocation + ForwardVector * CapsuleRadius;
 	StartTraces.Add(StartBackWallDetection);
 	const FVector EndBackWallDetection = ActorLocation + UpVector * MovementForward * 4000 + RightVector * MovementSideways * 4000 - ForwardVector * 30.f;
@@ -189,7 +191,8 @@ void UMyClimbComponent::LookForLedge()
 	}
 	if (!Player->GetIsMidAir() || Player->GetHookshotComponent()->GetIsUsingHookshot())
 		return; 
- 
+
+#pragma region -- LINETRACES --
 	auto World = GetWorld();
 	const FVector LowTraceStart = Player->GetActorLocation() + Player->GetActorUpVector() * ClimbData->BottomLedgeDetectionZOffset;
 	const FVector LowTraceEnd = LowTraceStart + Player->GetActorForwardVector() * ClimbData->LedgeClimbDetectionOffset.X;
@@ -202,9 +205,8 @@ void UMyClimbComponent::LookForLedge()
 	Parameters.AddIgnoredActor(Player);
 	const auto LowTrace = World->LineTraceSingleByChannel(LowHitResult, LowTraceStart, LowTraceEnd, ClimbData->LedgeChannel, Parameters, FCollisionResponseParams());
 	const auto HighTrace = World->LineTraceSingleByChannel(HighHitResult, HighTraceStart, HighTraceEnd, Player->GetBlockCollision(), Parameters, FCollisionResponseParams());
-
-	// DrawDebugLine(World, LowTraceStart, LowTraceEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
-	// DrawDebugLine(World, HighTraceStart, HighTraceEnd, FColor::Blue, false, EDrawDebugTrace::ForOneFrame);
+#pragma endregion
+	
 	if (LowTrace && !HighTrace)
 	{
 		LedgeClimbDestination = HighTraceEnd + FVector(0, 0, Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());

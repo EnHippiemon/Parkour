@@ -78,12 +78,10 @@ void UMySpringArmComponent::CameraOffsetByMovement()
 	const auto CharacterMovement = Player->GetMovementInput();
 	const auto Camera = Player->GetCamera();
 	const auto CameraRightVector = Camera->GetRightVector();
-
-	// ---------- TO DO: LOOK HERE ------------ 
-	// MIGHT BE THE WRONG THRESHOLD? 1.8 AND 0.2?
+	
 	constexpr float LeftThreshold = 1.8f;
 	constexpr float RightThreshold = 0.8f;
-
+	
 	// Sideways camera movement. Check if character's movement is towards left or right side of camera. 
 	if ((CharacterMovement.Rotation().Vector() - CameraRightVector).Length() > LeftThreshold)
 		CameraLerp(CurrentCameraOffsetY, -ArmData->CameraYZOffsetSpeedOnMove, ArmData->OffsetClamp.Y);
@@ -105,7 +103,7 @@ void UMySpringArmComponent::CameraOffsetByMovement()
 
 void UMySpringArmComponent::SetCameraOffset()
 {
-	auto DeltaTime = GetWorld()->DeltaTimeSeconds;
+	const auto DeltaTime = GetWorld()->DeltaTimeSeconds;
 	if (CurrentState != Eps_Climbing)
 	{
 		CurrentCameraOffsetZ = FMath::Lerp(CurrentCameraOffsetZ, 0.f, ArmData->WalkingExtensionSpeed * DeltaTime);
@@ -198,7 +196,6 @@ void UMySpringArmComponent::CheckWallBehindPlayer()
 	if (CurrentState != Eps_Climbing && Player->GetWallIsInFront() && bHasNoWallForDuration)
 		return;
 	
-	// DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, EDrawDebugTrace::ForOneFrame);
 	if (!bHasNoWallForDuration)
 		TargetArmLength = FMath::Lerp(TargetArmLength, ArmData->ArmLengthWallBehindPlayer, ArmData->SprintExtensionSpeed * World->DeltaTimeSeconds);
 
