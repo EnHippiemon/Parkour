@@ -304,7 +304,7 @@ void AMyCharacter::EnergyUsage()
 		return;
 	
 	// Flip 0 and 1 so movement speed is increased with higher value. 
-	MovementSpeedPercent = FMath::Clamp(ScaledFloorAngle * - 1 + 1, 0, 2);
+	MovementSpeedPercent = FMath::Clamp(ScaledFloorAngle * - 1 + 1, 0, 4);
 
 	MovementEnergy -= MovementLoss;
 }
@@ -368,6 +368,7 @@ void AMyCharacter::HandleJumpInput()
 		return;
 	}
 
+	// Regular jump 
 	if (GetCharacterMovement()->IsMovingOnGround())
 	{
 		MyAnimationComponent->SetCurrentAnimation(Eca_Jumping);
